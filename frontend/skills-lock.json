@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "flutter-building-layouts": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "9686218c0b724c42ea30e97a3cc081cf4de69b5f3b0aa6253bd012ce9d573834"
+    },
+    "flutter-caching-data": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "94d264d06725eb88d19f32eb21ba202fbaf887c4ce679ecd99cfd86a83b1748c"
+    },
+    "flutter-reducing-app-size": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "9c5cd2040b08348d0190f708d2908f0304d50a464127cc9abf54c19b34453963"
+    }
+  }
+}

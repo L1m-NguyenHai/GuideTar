@@ -1,0 +1,110 @@
+# ===== OS / File Explorer =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== Editors / IDEs =====
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.suo
+*.user
+*.userossc
+*.swp
+*.swo
+*~
+
+# ===== Logs =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ===== Environment / Secrets =====
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+site/
+.eggs/
+*.egg-info/
+pip-wheel-metadata/
+.python-version
+.venv/
+venv/
+ENV/
+env/
+.ipynb_checkpoints/
+
+# ===== JavaScript / Node.js =====
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+*.tsbuildinfo
+
+# ===== Flutter / Dart =====
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+android/app/debug/
+android/app/profile/
+android/app/release/
+app.*.symbols
+app.*.map.json
+
+# ===== Flutter platform-specific generated files =====
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/captures/
+frontend/ios/Pods/
+frontend/ios/.symlinks/
+frontend/ios/Flutter/Flutter.podspec
+frontend/macos/Pods/
+frontend/linux/flutter/ephemeral/
+frontend/windows/flutter/ephemeral/
+frontend/windows/runner/Debug/
+frontend/windows/runner/Release/
+
+# ===== Project-specific generated folders =====
+temp/
+output/
+cache_data/
+backend/.venv/
+backend/Models/chord-cnn-lstm-model/.venv/
+backend/Models/chord-cnn-lstm-model/mir/lib/
+
+# ===== Nested repositories =====
+backend/.git/
+frontend/.git/
