@@ -53,6 +53,7 @@ class HopAmChuanParser:
         key_original = self._extract_key_hint(soup)
         capo = None
         lyrics = self._extract_lyrics_block(soup)
+        lyrics = self._strip_leading_note_from_lyrics(lyrics, lyric_note_text)
         chord_set = sorted({chord.strip() for chord in _CHORD_RE.findall(lyrics) if chord.strip()})
 
         version = CrawledVersion(
@@ -175,6 +176,43 @@ class HopAmChuanParser:
             if text:
                 lines.append(text)
         return lines
+
+    def _strip_leading_note_from_lyrics(self, lyrics: str, lyric_note_text: str | None) -> str:
+        if not lyrics or not lyric_note_text:
+            return lyrics
+
+        def normalize(value: str) -> str:
+            return re.sub(r"\s+", " ", value).strip().lower()
+
+        note_norm = normalize(lyric_note_text)
+        lines = lyrics.splitlines()
+
+        while lines:
+            first_line = lines[0].strip()
+            if not first_line:
+                lines.pop(0)
+                continue
+
+            first_line_norm = normalize(first_line)
+            if first_line_norm == note_norm:
+                lines.pop(0)
+                continue
+
+            if first_line_norm.startswith(note_norm):
+                # Some songs put note and first lyric marker (e.g. Intro:) on one line.
+                trimmed = first_line[len(lyric_note_text) :].strip()
+                lines[0] = trimmed
+                if not lines[0]:
+                    lines.pop(0)
+                continue
+
+            if note_norm.startswith(first_line_norm) and first_line_norm.startswith(("tone ", "capo ")):
+                lines.pop(0)
+                continue
+
+            break
+
+        return "\n".join(lines)
 
     def _extract_first_link_text(self, soup: BeautifulSoup, selector: str) -> str | None:
         node = soup.select_one(selector)
