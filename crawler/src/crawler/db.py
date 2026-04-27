@@ -204,4 +204,9 @@ class CrawlerRepository:
 
 
 async def create_pool(database_url: str) -> asyncpg.Pool:
-    return await asyncpg.create_pool(dsn=database_url, min_size=1, max_size=8)
+    return await asyncpg.create_pool(
+        dsn=database_url,
+        min_size=1,
+        max_size=8,
+        statement_cache_size=0,
+    )

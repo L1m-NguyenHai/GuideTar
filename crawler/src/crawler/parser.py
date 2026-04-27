@@ -109,12 +109,24 @@ class HopAmChuanParser:
         return "unknown"
 
     def _extract_artists(self, soup: BeautifulSoup) -> list[str]:
-        artists = [item.get_text(strip=True) for item in soup.select("a[href*='/artist/']") if item.get_text(strip=True)]
+        artists = [
+            item.get_text(strip=True)
+            for item in soup.select("#song-author a[href*='/artist/'], #song-info a[href*='/artist/']")
+            if item.get_text(strip=True)
+        ]
+
+        if not artists:
+            artists = [
+                item.get_text(strip=True)
+                for item in soup.select("h1 + div a[href*='/artist/']")
+                if item.get_text(strip=True)
+            ]
+
         deduped: list[str] = []
         for artist in artists:
             if artist not in deduped:
                 deduped.append(artist)
-        return deduped
+        return deduped[:1]
 
     def _extract_key_hint(self, soup: BeautifulSoup) -> str | None:
         lyric_note = soup.select_one("#song-lyric .song-lyric-note")

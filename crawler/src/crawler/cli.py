@@ -4,10 +4,13 @@ import argparse
 import asyncio
 import logging
 
+from .artist_csv import export_artists_csv_from_songs
+from .catalog_sync import sync_public_catalog_from_csv
 from .config import Settings
 from .csv_export import write_songs_to_csv
 from .db import CrawlerRepository, create_pool
 from .ingest import CrawlService
+from .youtube_enrich import enrich_csv_with_youtube
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,11 +32,75 @@ def build_parser() -> argparse.ArgumentParser:
     crawl_listing_csv.add_argument("--limit", type=int, default=100, help="Maximum songs to crawl from listing")
     crawl_listing_csv.add_argument("--out", default="output/hac_songs.csv", help="Output CSV path")
 
+    enrich_csv = subparsers.add_parser(
+        "enrich-youtube-csv",
+        help="Search YouTube by title and write youtube_url + thumbnail_url columns",
+    )
+    enrich_csv.add_argument("--csv", required=True, help="Input CSV path")
+    enrich_csv.add_argument(
+        "--delay",
+        type=float,
+        default=0.35,
+        help="Delay between lookups in seconds",
+    )
+    enrich_csv.add_argument(
+        "--search-results",
+        type=int,
+        default=5,
+        help="Number of YouTube candidates to score per song",
+    )
+
+    artist_csv = subparsers.add_parser(
+        "export-artists-csv",
+        help="Split artists from songs CSV and export artist image CSV",
+    )
+    artist_csv.add_argument("--songs-csv", required=True, help="Input songs CSV path")
+    artist_csv.add_argument("--out", default="output/hac_tacgia.csv", help="Output artist CSV path")
+    artist_csv.add_argument(
+        "--with-youtube-fallback",
+        action="store_true",
+        help="Enable slower yt-dlp fallback when Deezer/Wikipedia have no image",
+    )
+
+    sync_catalog = subparsers.add_parser(
+        "sync-public-catalog",
+        help="Sync songs/artists CSV data into backend public catalog tables",
+    )
+    sync_catalog.add_argument("--songs-csv", default="output/hac_songs.csv", help="Input songs CSV path")
+    sync_catalog.add_argument("--artists-csv", default="output/hac_tacgia.csv", help="Input artists CSV path")
+
     return parser
 
 
 async def run_command(args: argparse.Namespace) -> int:
     settings = Settings()
+
+    if args.command == "enrich-youtube-csv":
+        updated = enrich_csv_with_youtube(
+            args.csv,
+            delay_seconds=args.delay,
+            search_results=max(1, args.search_results),
+        )
+        logging.info("YouTube enrichment completed. csv=%s updated=%s", args.csv, updated)
+        return 0
+
+    if args.command == "export-artists-csv":
+        total = export_artists_csv_from_songs(
+            args.songs_csv,
+            args.out,
+            use_youtube_fallback=args.with_youtube_fallback,
+        )
+        logging.info("Artist CSV generated at %s. rows=%s", args.out, total)
+        return 0
+
+    if args.command == "sync-public-catalog":
+        summary = await sync_public_catalog_from_csv(args.songs_csv, args.artists_csv)
+        logging.info(
+            "Catalog sync done. songs=%s artists=%s",
+            summary.get("songs", 0),
+            summary.get("artists", 0),
+        )
+        return 0
 
     if args.command == "crawl-listing-csv":
         service = CrawlService(settings)

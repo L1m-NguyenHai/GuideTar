@@ -265,6 +265,32 @@ class BackendApi {
         .toList(growable: false);
   }
 
+  static Future<List<Map<String, dynamic>>> getCatalogRecommendedSongs({
+    int limit = 10,
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/catalog/recommended?limit=$limit',
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  static Future<List<Map<String, dynamic>>> getCatalogArtists({
+    int limit = 20,
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/catalog/artists?limit=$limit',
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
   static Future<Map<String, dynamic>> getWeeklyAnalytics() async {
     final response = await _request(
       method: 'GET',

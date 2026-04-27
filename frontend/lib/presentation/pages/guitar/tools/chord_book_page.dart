@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:guidetar/presentation/pages/guitar/tools/song_gio_chord_page.dart';
+import 'package:guidetar/data/backend_api.dart';
+import 'package:guidetar/presentation/pages/guitar/tools/catalog_song_chord_page.dart';
 import 'package:guidetar/presentation/state/follow_state.dart';
 
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
@@ -15,6 +16,15 @@ class ChordBookPage extends StatefulWidget {
 
 class _ChordBookPageState extends State<ChordBookPage> {
   int _selectedNavIndex = 1;
+  late final Future<List<Map<String, dynamic>>> _recommendedFuture;
+  late final Future<List<Map<String, dynamic>>> _artistsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _recommendedFuture = BackendApi.getCatalogRecommendedSongs(limit: 10);
+    _artistsFuture = BackendApi.getCatalogArtists(limit: 20);
+  }
 
   void _onNavChanged(int index) {
     if (index == 0) {
@@ -41,11 +51,9 @@ class _ChordBookPageState extends State<ChordBookPage> {
                 children: [
                   _ChordHeader(),
                   SizedBox(height: 16),
-                  _RecommendedSection(),
+                  _RecommendedSection(recommendedFuture: _recommendedFuture),
                   SizedBox(height: 24),
-                  _AlbumSection(),
-                  SizedBox(height: 24),
-                  _ArtistSection(),
+                  _ArtistSection(artistsFuture: _artistsFuture),
                 ],
               ),
             ),
@@ -160,7 +168,9 @@ class _ChordHeader extends StatelessWidget {
 }
 
 class _RecommendedSection extends StatelessWidget {
-  const _RecommendedSection();
+  const _RecommendedSection({required this.recommendedFuture});
+
+  final Future<List<Map<String, dynamic>>> recommendedFuture;
 
   @override
   Widget build(BuildContext context) {
@@ -181,32 +191,65 @@ class _RecommendedSection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 192,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _RecommendCard(
-                imageAsset: 'assets/images/chord_reco_song_gio.png',
-                title: 'Sóng gió',
-                subtitle: 'K-ICM, Jack',
-                tag: 'trung cấp',
-                tagColor: const Color(0xFFF97316),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SongGioChordPage()),
-                  );
-                },
-              ),
-              const SizedBox(width: 16),
-              const _RecommendCard(
-                imageAsset: 'assets/images/chord_reco_bac_phan.png',
-                title: 'Bạc Phận',
-                subtitle: 'K-ICM, Jack',
-                tag: 'Nâng cao',
-                tagColor: Color(0xFFDC2626),
-              ),
-            ],
+          height: 224,
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: recommendedFuture,
+            builder: (context, snapshot) {
+              final items = snapshot.data ?? const <Map<String, dynamic>>[];
+              if (items.isNotEmpty) {
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final title = (item['title'] ?? '').toString();
+                    final artist = (item['artist'] ?? '').toString();
+                    final imageUrl = (item['thumbnail_url'] ?? '').toString();
+                    final hasYoutube = (item['youtube_url'] ?? '').toString().isNotEmpty;
+                    final tag = hasYoutube ? 'youtube' : 'hợp âm';
+                    final tagColor = hasYoutube ? const Color(0xFFDC2626) : const Color(0xFFF97316);
+
+                    return _RecommendCard(
+                      imageUrl: imageUrl,
+                      title: title,
+                      subtitle: artist,
+                      tag: tag,
+                      tagColor: tagColor,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CatalogSongChordPage(song: item),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2A2A2A)),
+                  ),
+                  child: Text(
+                    'Chưa tải được dữ liệu bài hát từ database. Hãy kiểm tra backend rồi mở lại trang.',
+                    style: GoogleFonts.splineSans(
+                      color: const Color(0xFFD1D5DB),
+                      fontSize: 13,
+                      height: 18 / 13,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -216,7 +259,8 @@ class _RecommendedSection extends StatelessWidget {
 
 class _RecommendCard extends StatelessWidget {
   const _RecommendCard({
-    required this.imageAsset,
+    this.imageAsset,
+    this.imageUrl,
     required this.title,
     required this.subtitle,
     required this.tag,
@@ -224,7 +268,8 @@ class _RecommendCard extends StatelessWidget {
     this.onTap,
   });
 
-  final String imageAsset;
+  final String? imageAsset;
+  final String? imageUrl;
   final String title;
   final String subtitle;
   final String tag;
@@ -248,7 +293,25 @@ class _RecommendCard extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(imageAsset, width: 256, height: 144, fit: BoxFit.cover),
+                    child: (imageUrl != null && imageUrl!.isNotEmpty)
+                        ? Image.network(
+                            imageUrl!,
+                            width: 256,
+                            height: 144,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              imageAsset ?? 'assets/images/chord_reco_song_gio.png',
+                              width: 256,
+                              height: 144,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Image.asset(
+                            imageAsset ?? 'assets/images/chord_reco_song_gio.png',
+                            width: 256,
+                            height: 144,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   Positioned(
                     left: 8,
@@ -277,6 +340,8 @@ class _RecommendCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.splineSans(
                 color: Colors.white,
                 fontSize: 16,
@@ -286,6 +351,8 @@ class _RecommendCard extends StatelessWidget {
             ),
             Text(
               subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.splineSans(
                 color: Colors.white,
                 fontSize: 12,
@@ -299,39 +366,61 @@ class _RecommendCard extends StatelessWidget {
   }
 }
 
-class _AlbumSection extends StatelessWidget {
-  const _AlbumSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SquareCardSection(
-      title: 'Dành cho bạn',
-      cards: const [
-        _SquareCardData('assets/images/chord_album_sontung.png', 'Album Sơn Tùng M-TP', false),
-        _SquareCardData('assets/images/chord_album_trungbinh.png', 'Album trung bình', false),
-      ],
-    );
-  }
-}
-
 class _ArtistSection extends StatelessWidget {
-  const _ArtistSection();
+  const _ArtistSection({required this.artistsFuture});
+
+  final Future<List<Map<String, dynamic>>> artistsFuture;
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: FollowState.isFollowingJack,
-      builder: (context, isFollowingJack, _) {
-        final cards = <_SquareCardData>[
-          if (isFollowingJack)
-            const _SquareCardData('assets/images/chord_artist_jack_followed.png', 'Jack - J97', true),
-          const _SquareCardData('assets/images/chord_artist_sontung.png', 'Sơn Tùng M-TP', true),
-          const _SquareCardData('assets/images/chord_artist_alanwalker.png', 'Alan Walker', true),
-        ];
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: artistsFuture,
+      builder: (context, snapshot) {
+        final artistItems = snapshot.data ?? const <Map<String, dynamic>>[];
+        if (artistItems.isNotEmpty) {
+          final cards = artistItems
+              .map(
+                (item) => _SquareCardData(
+                  title: (item['artist_name'] ?? '').toString(),
+                  circleImage: true,
+                  imageUrl: (item['image_url'] ?? '').toString(),
+                ),
+              )
+              .toList(growable: false);
 
-        return _SquareCardSection(
-          title: 'Nghệ sĩ yêu thích của bạn',
-          cards: cards,
+          return _SquareCardSection(
+            title: 'Nghệ sĩ yêu thích của bạn',
+            cards: cards,
+          );
+        }
+
+        return ValueListenableBuilder<bool>(
+          valueListenable: FollowState.isFollowingJack,
+          builder: (context, isFollowingJack, _) {
+            final cards = <_SquareCardData>[
+              if (isFollowingJack)
+                const _SquareCardData(
+                  title: 'Jack - J97',
+                  circleImage: true,
+                  imageAsset: 'assets/images/chord_artist_jack_followed.png',
+                ),
+              const _SquareCardData(
+                title: 'Sơn Tùng M-TP',
+                circleImage: true,
+                imageAsset: 'assets/images/chord_artist_sontung.png',
+              ),
+              const _SquareCardData(
+                title: 'Alan Walker',
+                circleImage: true,
+                imageAsset: 'assets/images/chord_artist_alanwalker.png',
+              ),
+            ];
+
+            return _SquareCardSection(
+              title: 'Nghệ sĩ yêu thích của bạn',
+              cards: cards,
+            );
+          },
         );
       },
     );
@@ -378,9 +467,15 @@ class _SquareCardSection extends StatelessWidget {
 }
 
 class _SquareCardData {
-  const _SquareCardData(this.imageAsset, this.title, this.circleImage);
+  const _SquareCardData({
+    required this.title,
+    required this.circleImage,
+    this.imageAsset,
+    this.imageUrl,
+  });
 
-  final String imageAsset;
+  final String? imageAsset;
+  final String? imageUrl;
   final String title;
   final bool circleImage;
 }
@@ -405,7 +500,19 @@ class _SquareCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: Image.asset(data.imageAsset, fit: BoxFit.cover),
+                    child: (data.imageUrl != null && data.imageUrl!.isNotEmpty)
+                        ? Image.network(
+                            data.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              data.imageAsset ?? 'assets/images/profile_user_avatar.png',
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Image.asset(
+                            data.imageAsset ?? 'assets/images/profile_user_avatar.png',
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   if (!data.circleImage)
                     Positioned.fill(
@@ -428,6 +535,8 @@ class _SquareCard extends StatelessWidget {
             width: 160,
             child: Text(
               data.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               textAlign: data.circleImage ? TextAlign.center : TextAlign.left,
               style: GoogleFonts.splineSans(
                 color: Colors.white,
