@@ -7,7 +7,6 @@ import 'package:guidetar/presentation/pages/support_page.dart';
 import 'package:guidetar/presentation/pages/add_note_page.dart';
 import 'package:guidetar/presentation/pages/edit_profile_page.dart';
 import 'package:guidetar/presentation/pages/favorite_list.dart';
-import 'package:guidetar/presentation/pages/guitar/tools/catalog_song_chord_page.dart';
 import 'package:guidetar/presentation/pages/weekly_info_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
@@ -332,7 +331,7 @@ class _StreakSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-    const states = [1, 1, 1, 1, 2, 0, 0];
+    const states = [1, 1, 2, 0, 0, 0, 0];
 
     return Container(
       width: double.infinity,
@@ -567,7 +566,9 @@ class _FavoritesSectionState extends State<_FavoritesSection> {
                 itemBuilder: (_, index) {
                   final song = songs[index];
                   return _FavoriteSongCard(
-                    song: song,
+                    title: (song['title'] ?? '').toString(),
+                    artist: (song['artist'] ?? '').toString(),
+                    thumbnailUrl: (song['thumbnail_url'] ?? '').toString(),
                   );
                 },
               );
