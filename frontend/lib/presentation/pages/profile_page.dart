@@ -4,8 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:guidetar/data/backend_api.dart';
 import 'package:guidetar/presentation/pages/support_page.dart';
 
+import 'package:guidetar/presentation/pages/add_note_page.dart';
 import 'package:guidetar/presentation/pages/edit_profile_page.dart';
 import 'package:guidetar/presentation/pages/favorite_list.dart';
+import 'package:guidetar/presentation/pages/guitar/tools/catalog_song_chord_page.dart';
 import 'package:guidetar/presentation/pages/weekly_info_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
@@ -456,8 +458,21 @@ class _StreakSection extends StatelessWidget {
   }
 }
 
-class _FavoritesSection extends StatelessWidget {
+class _FavoritesSection extends StatefulWidget {
   const _FavoritesSection();
+
+  @override
+  State<_FavoritesSection> createState() => _FavoritesSectionState();
+}
+
+class _FavoritesSectionState extends State<_FavoritesSection> {
+  late Future<List<Map<String, dynamic>>> _favoriteSongsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteSongsFuture = BackendApi.getFavoriteSongs();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -501,27 +516,62 @@ class _FavoritesSection extends StatelessWidget {
         const SizedBox(height: 16),
         SizedBox(
           height: 216,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: const [
-              _FavoriteSongCard(
-                imageAsset: 'assets/images/profile_favorite_1.png',
-                title: 'Sóng Gió',
-                artist: 'K-ICM x Jack',
-              ),
-              SizedBox(width: 8),
-              _FavoriteSongCard(
-                imageAsset: 'assets/images/profile_favorite_2.png',
-                title: 'Đom đóm',
-                artist: 'K-ICM x Jack',
-              ),
-              SizedBox(width: 8),
-              _FavoriteSongCard(
-                imageAsset: 'assets/images/profile_favorite_3.png',
-                title: 'Bạc phận',
-                artist: 'K-ICM x Jack',
-              ),
-            ],
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _favoriteSongsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFFF97F08),
+                      ),
+                      strokeWidth: 2,
+                    ),
+                  ),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Không thể tải danh sách yêu thích',
+                    style: GoogleFonts.manrope(
+                      color: const Color(0xFFDEC1AF),
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }
+
+              final songs = snapshot.data ?? [];
+              if (songs.isEmpty) {
+                return Center(
+                  child: Text(
+                    'Chưa có bài hát yêu thích',
+                    style: GoogleFonts.manrope(
+                      color: const Color(0xFFDEC1AF),
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }
+
+              final displayCount = songs.length > 5 ? 5 : songs.length;
+              return ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: displayCount,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, index) {
+                  final song = songs[index];
+                  return _FavoriteSongCard(
+                    song: song,
+                  );
+                },
+              );
+            },
           ),
         ),
       ],
@@ -531,14 +581,14 @@ class _FavoritesSection extends StatelessWidget {
 
 class _FavoriteSongCard extends StatelessWidget {
   const _FavoriteSongCard({
-    required this.imageAsset,
     required this.title,
     required this.artist,
+    required this.thumbnailUrl,
   });
 
-  final String imageAsset;
   final String title;
   final String artist;
+  final String thumbnailUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -555,7 +605,27 @@ class _FavoriteSongCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(imageAsset, fit: BoxFit.cover),
+                  thumbnailUrl.isNotEmpty
+                      ? Image.network(
+                          thumbnailUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF2A2A29),
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Color(0xFFDEC1AF),
+                              size: 40,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFF2A2A29),
+                          child: const Icon(
+                            Icons.music_note,
+                            color: Color(0xFFDEC1AF),
+                            size: 40,
+                          ),
+                        ),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -601,8 +671,21 @@ class _FavoriteSongCard extends StatelessWidget {
   }
 }
 
-class _RecentLessonsSection extends StatelessWidget {
+class _RecentLessonsSection extends StatefulWidget {
   const _RecentLessonsSection();
+
+  @override
+  State<_RecentLessonsSection> createState() => _RecentLessonsSectionState();
+}
+
+class _RecentLessonsSectionState extends State<_RecentLessonsSection> {
+  late Future<List<Map<String, dynamic>>> _recentLessonsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _recentLessonsFuture = BackendApi.getRecentLessons();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -635,19 +718,70 @@ class _RecentLessonsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        const _RecentCourseCard(
-          imageAsset: 'assets/images/profile_recent_1.png',
-          title: 'Giới thiệu về piano',
-          progress: 0.2,
-          progressText: '20%',
-        ),
-        const SizedBox(height: 20),
-        const _RecentCourseCard(
-          imageAsset: 'assets/images/profile_recent_2.png',
-          title: 'Sóng gió',
-          subtitle: 'Sóng gió | ICM x Jack | Official Music',
-          progress: 0.88,
-          progressText: '88%',
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _recentLessonsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFFF97F08),
+                    ),
+                    strokeWidth: 2,
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Không thể tải bài học gần đây',
+                  style: GoogleFonts.manrope(
+                    color: const Color(0xFFDEC1AF),
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+
+            final lessons = snapshot.data ?? [];
+            if (lessons.isEmpty) {
+              return Center(
+                child: Text(
+                  'Chưa có bài học gần đây',
+                  style: GoogleFonts.manrope(
+                    color: const Color(0xFFDEC1AF),
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              children: List.generate(
+                lessons.length > 2 ? 2 : lessons.length,
+                (index) {
+                  final lesson = lessons[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index < (lessons.length > 2 ? 2 : lessons.length) - 1 ? 20 : 0,
+                    ),
+                    child: _RecentCourseCard(
+                      title: (lesson['title'] ?? '').toString(),
+                      description: (lesson['description'] ?? '').toString(),
+                      thumbnailUrl: (lesson['thumbnail_url'] ?? '').toString(),
+                      progress: 0.6,
+                      progressText: '60%',
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
     );
@@ -656,16 +790,16 @@ class _RecentLessonsSection extends StatelessWidget {
 
 class _RecentCourseCard extends StatelessWidget {
   const _RecentCourseCard({
-    required this.imageAsset,
     required this.title,
     required this.progress,
     required this.progressText,
-    this.subtitle,
+    required this.thumbnailUrl,
+    this.description,
   });
 
-  final String imageAsset;
   final String title;
-  final String? subtitle;
+  final String? description;
+  final String thumbnailUrl;
   final double progress;
   final String progressText;
 
@@ -686,7 +820,27 @@ class _RecentCourseCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(imageAsset, fit: BoxFit.cover),
+                thumbnailUrl.isNotEmpty
+                    ? Image.network(
+                        thumbnailUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF2A2A29),
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            color: Color(0xFFDEC1AF),
+                            size: 40,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: const Color(0xFF2A2A29),
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: Color(0xFFDEC1AF),
+                          size: 40,
+                        ),
+                      ),
                 _SafeSvgAsset('assets/icons/profile_recent_overlay.svg'),
               ],
             ),
@@ -705,7 +859,7 @@ class _RecentCourseCard extends StatelessWidget {
                     height: 28 / 20,
                   ),
                 ),
-                if (subtitle == null)
+                if (description == null || description!.isEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Row(
@@ -752,7 +906,7 @@ class _RecentCourseCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      subtitle!,
+                      description!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.manrope(
@@ -830,31 +984,40 @@ class _PersonalNotesSection extends StatelessWidget {
                 height: 28 / 20,
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2A2A29),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: _SafeSvgAsset('assets/icons/profile_add_note.svg'),
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AddNotePage(),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'THÊM GHI CHÚ',
-                    style: GoogleFonts.manrope(
-                      color: const Color(0xFFFFB786),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      height: 16 / 12,
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2A2A29),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: _SafeSvgAsset('assets/icons/profile_add_note.svg'),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Text(
+                      'THÊM GHI CHÚ',
+                      style: GoogleFonts.manrope(
+                        color: const Color(0xFFFFB786),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                        height: 16 / 12,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
