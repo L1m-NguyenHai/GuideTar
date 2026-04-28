@@ -315,7 +315,12 @@ class _DeChordPageState extends State<DeChordPage> {
 
     final configured = _configuredBaseUrl.trim();
     if (configured.isNotEmpty) {
-      return <String>[normalize(configured)];
+      // On web, replace Android-specific loopback (10.0.2.2) with localhost
+      String url = configured;
+      if (kIsWeb && configured.contains('10.0.2.2')) {
+        url = configured.replaceAll('10.0.2.2', 'localhost');
+      }
+      return <String>[normalize(url)];
     }
 
     final urls = <String>[];
@@ -404,7 +409,7 @@ class _DeChordPageState extends State<DeChordPage> {
             fileBytes: null,
             isYoutubeSource: payload['source_type']?.toString() == 'youtube',
             youtubeUrl: payload['source_url']?.toString(),
-            youtubeThumbnailUrl: null,
+            youtubeThumbnailUrl: payload['thumbnail_url']?.toString(),
           ),
         ),
       );

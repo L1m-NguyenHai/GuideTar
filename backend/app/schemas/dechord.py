@@ -10,6 +10,7 @@ class AnalyzeHistoryItem(BaseModel):
     source_type: str
     source_name: str | None = None
     source_url: str | None = None
+    thumbnail_url: str | None = None
     bpm: float | None = None
     time_signature: int | None = None
     chord_count: int

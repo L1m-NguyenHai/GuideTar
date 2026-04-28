@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:guidetar/presentation/pages/guitar/tools/metronome_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 import 'package:guidetar/presentation/pages/profile_page.dart';
 
@@ -289,8 +290,8 @@ class _RecentToolsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Text(
+      children: [
+        const Text(
           'Công cụ',
           style: TextStyle(
             color: Colors.white,
@@ -299,19 +300,24 @@ class _RecentToolsSection extends StatelessWidget {
             height: 1.4,
           ),
         ),
-        SizedBox(height: 24),
-        _RecentToolItem(
+        const SizedBox(height: 24),
+        const _RecentToolItem(
           title: 'Pro Tuner',
           subtitle: 'Chỉnh dây guitar',
           iconBgColor: Color.fromRGBO(249, 127, 6, 0.2),
           iconAsset: 'assets/icons/recent_tool_tuner.svg',
         ),
-        SizedBox(height: 16),
-        _RecentToolItem(
-          title: 'Metronome',
-          subtitle: 'Tùy chỉnh nhịp độ và phân nhịp',
-          iconAsset: 'assets/icons/recent_tool_metronome_bg.svg',
-        ),
+        const SizedBox(height: 16),
+          _RecentToolItem(
+            title: 'Metronome',
+            subtitle: 'Tùy chỉnh nhịp độ và phân nhịp',
+            iconAsset: 'assets/icons/recent_tool_metronome_bg.svg',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MetronomePage()),
+              );
+            },
+          ),
       ],
     );
   }
@@ -323,79 +329,85 @@ class _RecentToolItem extends StatelessWidget {
     required this.subtitle,
     required this.iconAsset,
     this.iconBgColor,
+    this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String iconAsset;
   final Color? iconBgColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14.913),
-      decoration: BoxDecoration(
-        color: const Color(0xFF20201F),
-        borderRadius: BorderRadius.circular(14.913),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 94.448,
-            height: 69.593,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                width: 69.593,
-                height: 69.593,
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  borderRadius: BorderRadius.circular(9.942),
-                ),
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: 24.855,
-                  height: 24.855,
-                  child: _SafeSvgAsset(iconAsset),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14.913),
+        decoration: BoxDecoration(
+          color: const Color(0xFF20201F),
+          borderRadius: BorderRadius.circular(14.913),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 94.448,
+              height: 69.593,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 69.593,
+                  height: 69.593,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(9.942),
+                  ),
+                  alignment: Alignment.center,
+                  child: SizedBox(
+                    width: 24.855,
+                    height: 24.855,
+                    child: _SafeSvgAsset(iconAsset),
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 19.884,
-                    fontWeight: FontWeight.w700,
-                    height: 29.826 / 19.884,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontSize: 19.884,
+                      fontWeight: FontWeight.w700,
+                      height: 29.826 / 19.884,
+                    ),
                   ),
-                ),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.manrope(
-                    color: const Color.fromRGBO(255, 255, 255, 0.6),
-                    fontSize: 14.913,
-                    fontWeight: FontWeight.w400,
-                    height: 19.884 / 14.913,
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.manrope(
+                      color: const Color.fromRGBO(255, 255, 255, 0.6),
+                      fontSize: 14.913,
+                      fontWeight: FontWeight.w400,
+                      height: 19.884 / 14.913,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 7.664,
-            height: 12.427,
-            child: _SafeSvgAsset('assets/icons/recent_chevron.svg'),
-          ),
-        ],
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 7.664,
+              height: 12.427,
+              child: _SafeSvgAsset('assets/icons/recent_chevron.svg'),
+            ),
+          ],
+        ),
       ),
     );
   }

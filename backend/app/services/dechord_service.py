@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections
 import collections.abc
+import json
 import math
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ import numpy as np
 from fastapi import HTTPException, Request, UploadFile
 from madmom.features.beats import DBNBeatTrackingProcessor, RNNBeatProcessor
 from yt_dlp import YoutubeDL
+import httpx
 
 from app.core.database import execute, is_db_ready
 from app.core.security import decode_token
@@ -471,6 +473,29 @@ def optional_user_id(request: Request) -> str | None:
     return user_id or None
 
 
+async def fetch_youtube_thumbnail(youtube_url: str) -> str | None:
+    """Fetch YouTube video thumbnail URL using oEmbed API."""
+    if not youtube_url:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(
+                "https://www.youtube.com/oembed",
+                params={
+                    "url": youtube_url,
+                    "format": "json",
+                },
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("thumbnail_url")
+    except Exception:
+        pass
+
+    return None
+
+
 async def save_analysis_history(
     request: Request,
     response: dict[str, object],
@@ -484,6 +509,11 @@ async def save_analysis_history(
     if user_id is None:
         return
 
+    # Fetch YouTube thumbnail if it's a YouTube source
+    thumbnail_url = None
+    if youtube_url:
+        thumbnail_url = await fetch_youtube_thumbnail(youtube_url)
+
     analysis_id = str(uuid4())
     beat_detection = response.get("beatDetectionResult")
     detected_bpm = None
@@ -495,16 +525,17 @@ async def save_analysis_history(
     await execute(
         """
         insert into dechord_analyses (
-            id, user_id, source_type, source_name, source_url,
+            id, user_id, source_type, source_name, source_url, thumbnail_url,
             bpm, time_signature, chord_count, raw_chord_count
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         """,
         analysis_id,
         user_id,
         "youtube" if youtube_url else "file",
         filename_for_response,
         youtube_url,
+        thumbnail_url,
         detected_bpm,
         detected_time_signature,
         response.get("chord_count", 0),

@@ -34,7 +34,7 @@ async def analyze_audio(
 async def analyze_history(current_user: UserMeResponse = Depends(get_current_user)) -> list[AnalyzeHistoryItem]:
     rows = await fetch(
         """
-        select id::text as id, source_type, source_name, source_url, bpm, time_signature,
+        select id::text as id, source_type, source_name, source_url, thumbnail_url, bpm, time_signature,
                chord_count, raw_chord_count, created_at
         from dechord_analyses
         where user_id = $1
@@ -52,7 +52,7 @@ async def analyze_history_detail(
 ) -> dict[str, object]:
     analysis = await fetch(
         """
-        select id::text as id, source_type, source_name, source_url, bpm, time_signature,
+        select id::text as id, source_type, source_name, source_url, thumbnail_url, bpm, time_signature,
                chord_count, raw_chord_count, created_at
         from dechord_analyses
         where id::text = $1 and user_id = $2
@@ -68,7 +68,7 @@ async def analyze_history_detail(
 
     beats_rows = await fetch(
         """
-        select beat_index, beat_time, chord_label
+        select beat_index, beat_time_seconds, chord_label
         from dechord_analysis_beats
         where analysis_id::text = $1
         order by beat_index asc
@@ -87,4 +87,8 @@ async def analyze_history_detail(
         },
         "chord_count": analysis_row.get("chord_count", len(chords)),
         "rawChordCount": analysis_row.get("raw_chord_count", 0),
+        "source_type": analysis_row.get("source_type"),
+        "source_name": analysis_row.get("source_name"),
+        "source_url": analysis_row.get("source_url"),
+        "thumbnail_url": analysis_row.get("thumbnail_url"),
     }

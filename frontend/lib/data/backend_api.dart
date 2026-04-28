@@ -58,6 +58,10 @@ class BackendApi {
     throw ApiException('Backend trả về dữ liệu không hợp lệ.');
   }
 
+  static Future<Uint8List> _decodeBytes(http.Response response) async {
+    return response.bodyBytes;
+  }
+
   static Future<List<dynamic>> _decodeList(http.Response response) async {
     if (response.body.isEmpty) {
       return <dynamic>[];
@@ -163,6 +167,55 @@ class BackendApi {
     throw ApiException(
       'Không thể kết nối tới backend. Kiểm tra server rồi thử lại.',
     );
+  }
+
+  static Future<Uint8List> generateEarTrainingSound({
+    required String mode,
+    required String value,
+    String? secondaryValue,
+    int durationMs = 1400,
+    int sampleRate = 44100,
+    double gain = 0.22,
+  }) async {
+    final payload = <String, dynamic>{
+      'mode': mode,
+      'value': value,
+      'duration_ms': durationMs,
+      'sample_rate': sampleRate,
+      'gain': gain,
+    };
+    if (secondaryValue != null && secondaryValue.trim().isNotEmpty) {
+      payload['secondary_value'] = secondaryValue.trim();
+    }
+
+    for (final baseUrl in _candidateBaseUrls()) {
+      final uri = Uri.parse('$baseUrl/api/ear-training/sound');
+      try {
+        final response = await http
+            .post(
+              uri,
+              headers: <String, String>{'Content-Type': 'application/json'},
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 20));
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return _decodeBytes(response);
+        }
+
+        throw _buildApiError(response);
+      } on SocketException {
+        continue;
+      } on HttpException {
+        continue;
+      } on ApiException {
+        rethrow;
+      } catch (_) {
+        continue;
+      }
+    }
+
+    throw ApiException('Không thể kết nối tới backend. Kiểm tra server rồi thử lại.');
   }
 
   static Future<Map<String, dynamic>> login({

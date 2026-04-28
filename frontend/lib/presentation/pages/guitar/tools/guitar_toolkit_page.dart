@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/chord_book_page.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/dechord_page.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/guitar_ear_training_page.dart';
+import 'package:guidetar/presentation/pages/guitar/tools/metronome_page.dart';
 import 'package:guidetar/presentation/pages/guitar/courses/guitar_course_page.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/pro_tuner_page.dart';
 import 'package:guidetar/presentation/pages/login_page.dart';
@@ -520,6 +521,7 @@ class _ToolsSection extends StatelessWidget {
         title: 'Metronome',
         description: 'Đơn giản mà một cái metronome đầy đủ tính năng',
         iconAsset: 'assets/icons/guitar_toolkit_icon_metronome_bg.svg',
+        opensMetronome: true,
       ),
       const _ToolItem(
         title: 'Luyện cảm âm',
@@ -550,8 +552,16 @@ class _ToolsSection extends StatelessWidget {
                         : (listModeTools[i].opensDeChord
                               ? onDeChordTap
                               : (listModeTools[i].opensEarTraining
-                                    ? onEarTrainingTap
-                                    : null))),
+                                ? onEarTrainingTap
+                                : (listModeTools[i].opensMetronome
+                                  ? () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const MetronomePage(),
+                                        ),
+                                      );
+                                    }
+                                  : null)))),
             ),
             if (i != listModeTools.length - 1) const SizedBox(height: 12),
           ],
@@ -579,7 +589,15 @@ class _ToolsSection extends StatelessWidget {
                                   ? onDeChordTap
                                   : (tool.opensEarTraining
                                         ? onEarTrainingTap
-                                        : null))),
+                                        : (tool.opensMetronome
+                                          ? () {
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) => const MetronomePage(),
+                                                ),
+                                              );
+                                            }
+                                          : null)))),
                 ),
               ),
           ],
@@ -683,6 +701,7 @@ class _ToolItem {
     this.opensChordBook = false,
     this.opensDeChord = false,
     this.opensEarTraining = false,
+    this.opensMetronome = false,
   });
 
   final String title;
@@ -694,6 +713,7 @@ class _ToolItem {
   final bool opensChordBook;
   final bool opensDeChord;
   final bool opensEarTraining;
+  final bool opensMetronome;
 }
 
 class _ToolCard extends StatelessWidget {
