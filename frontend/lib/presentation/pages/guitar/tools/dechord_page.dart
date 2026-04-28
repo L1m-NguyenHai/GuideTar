@@ -531,6 +531,33 @@ class _DeChordPageState extends State<DeChordPage> {
     }
   }
 
+  Future<void> _loadHistoryDetail(String analysisId) async {
+    try {
+      final payload = await BackendApi.getAnalyzeHistoryDetail(analysisId);
+      final result = DechordAnalyzeResult.fromJson(payload);
+
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DeChordResultPage(
+            result: result,
+            fileName: payload['source_name']?.toString(),
+            filePath: null,
+            fileBytes: null,
+            isYoutubeSource: payload['source_type']?.toString() == 'youtube',
+            youtubeUrl: payload['source_url']?.toString(),
+            youtubeThumbnailUrl: null,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không tải được kết quả: ${error.toString()}')),
+      );
+    }
+  }
+
   String _formatRecentDate(dynamic value) {
     final parsed = DateTime.tryParse((value ?? '').toString());
     if (parsed == null) return '--/--';
@@ -734,11 +761,14 @@ class _DeChordPageState extends State<DeChordPage> {
                     )
                   else
                     for (int i = 0; i < _recentAnalyses.length && i < 5; i++) ...[
-                      _RecentSongItem(
-                        sourceType: (_recentAnalyses[i]['source_type'] ?? 'file').toString(),
-                        title: (_recentAnalyses[i]['source_name'] ?? 'Bài hát không tên').toString(),
-                        subtitle:
-                            '${_formatRecentDate(_recentAnalyses[i]['created_at'])} • ${(_recentAnalyses[i]['chord_count'] ?? 0)} chords',
+                      GestureDetector(
+                        onTap: () => _loadHistoryDetail(_recentAnalyses[i]['id']?.toString() ?? ''),
+                        child: _RecentSongItem(
+                          sourceType: (_recentAnalyses[i]['source_type'] ?? 'file').toString(),
+                          title: (_recentAnalyses[i]['source_name'] ?? 'Bài hát không tên').toString(),
+                          subtitle:
+                              '${_formatRecentDate(_recentAnalyses[i]['created_at'])} • ${(_recentAnalyses[i]['chord_count'] ?? 0)} chords',
+                        ),
                       ),
                       if (i < 4 && i < _recentAnalyses.length - 1) const SizedBox(height: 12),
                     ],

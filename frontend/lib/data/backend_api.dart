@@ -433,6 +433,15 @@ class BackendApi {
         .toList(growable: false);
   }
 
+  static Future<Map<String, dynamic>> getAnalyzeHistoryDetail(String analysisId) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/api/analyze/history/$analysisId',
+      requireAuth: true,
+    );
+    return _decodeMap(response);
+  }
+
   static Future<Map<String, dynamic>> pay({
     required double amount,
     required String currency,
