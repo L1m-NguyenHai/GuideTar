@@ -34,11 +34,17 @@ class DeChordResultPage extends StatefulWidget {
 }
 
 class _DeChordResultPageState extends State<DeChordResultPage> {
+  static const int _capoMin = 0;
+  static const int _capoMax = 7;
+  static const List<String> _sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  static const List<String> _flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
   VideoPlayerController? _videoController;
   YoutubePlayerController? _youtubeController;
   Timer? _positionTicker;
   Timer? _youtubeInitTimeout;
 
+  int _capo = 0;
   bool _isAudioReady = false;
   bool _isPlaying = false;
   bool _isPreparingAudio = true;
@@ -291,11 +297,77 @@ class _DeChordResultPageState extends State<DeChordResultPage> {
     return '$minutes:$seconds';
   }
 
+  void _setCapo(int value) {
+    final next = value.clamp(_capoMin, _capoMax);
+    if (next == _capo) return;
+    setState(() {
+      _capo = next;
+    });
+  }
+
+  List<String> _transposeChordsForCapo(List<String> labels, int capo) {
+    if (capo <= 0) return labels;
+    final semitoneShift = -capo;
+    return labels
+        .map((label) => _transposeChordLabel(label, semitoneShift))
+        .toList(growable: false);
+  }
+
+  String _transposeChordLabel(String label, int semitones) {
+    final trimmed = label.trim();
+    if (trimmed.isEmpty || trimmed == 'N/C') return label;
+
+    final parts = trimmed.split('/');
+    final transposedParts = parts
+        .map((part) => _transposeChordPart(part, semitones))
+        .toList(growable: false);
+    return transposedParts.join('/');
+  }
+
+  String _transposeChordPart(String part, int semitones) {
+    final token = part.trim();
+    if (token.isEmpty) return part;
+
+    final root = _readRoot(token);
+    if (root == null) return part;
+
+    final preferSharps = root.contains('#');
+    final index = _noteToIndex(root);
+    if (index == null) return part;
+
+    final nextIndex = (index + semitones) % 12;
+    final safeIndex = nextIndex < 0 ? nextIndex + 12 : nextIndex;
+    final nextRoot = preferSharps ? _sharpNotes[safeIndex] : _flatNotes[safeIndex];
+    return '$nextRoot${token.substring(root.length)}';
+  }
+
+  String? _readRoot(String token) {
+    if (token.isEmpty) return null;
+    final first = token[0].toUpperCase();
+    if (!'ABCDEFG'.contains(first)) return null;
+    if (token.length >= 2) {
+      final second = token[1];
+      if (second == '#' || second == 'b') {
+        return '$first$second';
+      }
+    }
+    return first;
+  }
+
+  int? _noteToIndex(String note) {
+    final idxSharp = _sharpNotes.indexOf(note);
+    if (idxSharp != -1) return idxSharp;
+    final idxFlat = _flatNotes.indexOf(note);
+    if (idxFlat != -1) return idxFlat;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = _duration.inMilliseconds <= 0
         ? 0.0
         : (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0);
+    final displayChords = _transposeChordsForCapo(widget.result.displayChords, _capo);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
@@ -383,10 +455,19 @@ class _DeChordResultPageState extends State<DeChordResultPage> {
                 onSeek: _seekTo,
               ),
               const SizedBox(height: 18),
-              _ResultSummarySection(result: widget.result),
+              _ResultSummarySection(result: widget.result, capo: _capo),
+              const SizedBox(height: 12),
+              _CapoControl(
+                capo: _capo,
+                minCapo: _capoMin,
+                maxCapo: _capoMax,
+                onDecrease: () => _setCapo(_capo - 1),
+                onIncrease: () => _setCapo(_capo + 1),
+              ),
               const SizedBox(height: 14),
               _ResultChordTimeline(
                 result: widget.result,
+                displayChords: displayChords,
                 activeIndex: _activeBeatIndex,
               ),
             ],
@@ -503,9 +584,10 @@ class _AudioSyncPanel extends StatelessWidget {
 }
 
 class _ResultSummarySection extends StatelessWidget {
-  const _ResultSummarySection({required this.result});
+  const _ResultSummarySection({required this.result, required this.capo});
 
   final DechordAnalyzeResult result;
+  final int capo;
 
   Widget _buildMiniCard({required String title, required String value}) {
     return Expanded(
@@ -562,10 +644,125 @@ class _ResultSummarySection extends StatelessWidget {
             const SizedBox(width: 10),
             _buildMiniCard(title: 'RAW', value: result.rawChordCount.toString()),
             const SizedBox(width: 10),
-            _buildMiniCard(title: 'MODEL', value: 'AI'),
+            _buildMiniCard(title: 'CAPO', value: capo.toString()),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _CapoControl extends StatelessWidget {
+  const _CapoControl({
+    required this.capo,
+    required this.minCapo,
+    required this.maxCapo,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  final int capo;
+  final int minCapo;
+  final int maxCapo;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  @override
+  Widget build(BuildContext context) {
+    final canDecrease = capo > minCapo;
+    final canIncrease = capo < maxCapo;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131313),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color.fromRGBO(255, 255, 255, 0.07)),
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Capo',
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            '0–7',
+            style: GoogleFonts.manrope(
+              color: const Color(0xFF8A8A8A),
+              fontSize: 12,
+            ),
+          ),
+          const Spacer(),
+          _CapoButton(
+            icon: Icons.remove,
+            enabled: canDecrease,
+            onTap: onDecrease,
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 44,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1B1B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color.fromRGBO(255, 255, 255, 0.08)),
+            ),
+            child: Text(
+              capo.toString(),
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _CapoButton(
+            icon: Icons.add,
+            enabled: canIncrease,
+            onTap: onIncrease,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CapoButton extends StatelessWidget {
+  const _CapoButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFFFF923E) : const Color(0xFF2A2A2A),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          color: enabled ? const Color(0xFF4D2300) : const Color(0xFF707070),
+          size: 18,
+        ),
+      ),
     );
   }
 }
@@ -607,10 +804,12 @@ class _TimelineMeasureModel {
 class _ResultChordTimeline extends StatefulWidget {
   const _ResultChordTimeline({
     required this.result,
+    required this.displayChords,
     required this.activeIndex,
   });
 
   final DechordAnalyzeResult result;
+  final List<String> displayChords;
   final int activeIndex;
 
   @override
@@ -627,21 +826,21 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
 
   int get _beatsPerMeasure => widget.result.timeSignature <= 0 ? 4 : widget.result.timeSignature;
 
-  bool get _compactMode => widget.result.displayChords.length >= _longSongThreshold;
+  bool get _compactMode => widget.displayChords.length >= _longSongThreshold;
 
   @override
   void initState() {
     super.initState();
-    _measures = _buildMeasures(widget.result.displayChords, _beatsPerMeasure);
+    _measures = _buildMeasures(widget.displayChords, _beatsPerMeasure);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollWithActive(force: true));
   }
 
   @override
   void didUpdateWidget(covariant _ResultChordTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.result.displayChords != widget.result.displayChords ||
+    if (oldWidget.displayChords != widget.displayChords ||
         oldWidget.result.timeSignature != widget.result.timeSignature) {
-      _measures = _buildMeasures(widget.result.displayChords, _beatsPerMeasure);
+      _measures = _buildMeasures(widget.displayChords, _beatsPerMeasure);
       _lastFollowedMeasure = -1;
     }
 
@@ -659,7 +858,7 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
   void _syncScrollWithActive({bool force = false}) {
     if (!_scrollController.hasClients || _measures.isEmpty) return;
 
-    final active = widget.activeIndex.clamp(0, widget.result.displayChords.isEmpty ? 0 : widget.result.displayChords.length - 1);
+    final active = widget.activeIndex.clamp(0, widget.displayChords.isEmpty ? 0 : widget.displayChords.length - 1);
     final measureIndex = active ~/ _beatsPerMeasure;
     if (!force && measureIndex == _lastFollowedMeasure) return;
 
@@ -700,7 +899,7 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Timeline hợp âm (${widget.result.displayChords.length} beat)',
+            'Timeline hợp âm (${widget.displayChords.length} beat)',
             style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
               fontSize: 18,
@@ -730,7 +929,7 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
                 final measure = _measures[index];
                 final active = widget.activeIndex.clamp(
                   0,
-                  widget.result.displayChords.isEmpty ? 0 : widget.result.displayChords.length - 1,
+                  widget.displayChords.isEmpty ? 0 : widget.displayChords.length - 1,
                 );
                 return RepaintBoundary(
                   child: _TimelineMeasureRow(
@@ -765,37 +964,31 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
     }
 
     for (int start = 0; start < labels.length; start += normalizedBeatsPerMeasure) {
-      final cells = <_TimelineBeatCellModel>[];
-      String measureFirstChord = '';
-      
+      final rawLabels = <String>[];
       for (int offset = 0; offset < normalizedBeatsPerMeasure; offset++) {
         final beatIndex = start + offset;
-        final label = beatIndex < labels.length ? labels[beatIndex] : '';
-        
-        if (offset == 0 && label.isNotEmpty) {
-          measureFirstChord = label;
+        rawLabels.add(beatIndex < labels.length ? labels[beatIndex] : '');
+      }
+
+      String carryChord = '';
+      for (int j = start - 1; j >= 0; j--) {
+        if (labels[j].trim().isNotEmpty) {
+          carryChord = labels[j];
+          break;
         }
-        
+      }
+
+      final compressedLabels = _compressMeasureLabels(rawLabels, carryChord);
+      final cells = <_TimelineBeatCellModel>[];
+      for (int offset = 0; offset < normalizedBeatsPerMeasure; offset++) {
+        final beatIndex = start + offset;
         cells.add(
           _TimelineBeatCellModel(
-            label: label,
+            label: compressedLabels[offset],
             index: beatIndex,
             beatInMeasure: offset + 1,
           ),
         );
-      }
-
-      // Guarantee ≥1 chord per measure: if all empty, use first non-empty from earlier
-      if (measureFirstChord.isEmpty) {
-        for (int j = start - 1; j >= 0; j--) {
-          if (labels[j].isNotEmpty) {
-            measureFirstChord = labels[j];
-            break;
-          }
-        }
-        if (measureFirstChord.isNotEmpty && cells.first.label.isEmpty) {
-          cells[0] = cells[0].copyWith(label: measureFirstChord);
-        }
       }
 
       measures.add(
@@ -808,6 +1001,39 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
     }
 
     return measures;
+  }
+
+  List<String> _compressMeasureLabels(List<String> rawLabels, String carryChord) {
+    final length = rawLabels.length;
+    if (length == 0) return rawLabels;
+
+    final trimmed = rawLabels.map((label) => label.trim()).toList(growable: false);
+    final compressed = List<String>.from(rawLabels);
+
+    for (int i = 1; i < length; i++) {
+      final current = trimmed[i];
+      if (current.isEmpty) continue;
+      final prev = trimmed[i - 1];
+      if (prev.isNotEmpty && prev == current) {
+        compressed[i] = '';
+      }
+    }
+
+    final allSameNonEmpty = trimmed.every((label) => label.isNotEmpty) &&
+        trimmed.every((label) => label == trimmed.first);
+    if (allSameNonEmpty) {
+      for (int i = 1; i < length; i++) {
+        compressed[i] = '';
+      }
+      compressed[0] = rawLabels.first;
+    }
+
+    final hasAny = compressed.any((label) => label.trim().isNotEmpty);
+    if (!hasAny && carryChord.trim().isNotEmpty) {
+      compressed[length - 1] = carryChord;
+    }
+
+    return compressed;
   }
 }
 
