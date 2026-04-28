@@ -206,13 +206,15 @@ class _DeChordResultPageState extends State<DeChordResultPage> {
     if (beats.isEmpty) return 0;
 
     int index = 0;
+    double? closestPastBeat;
+
     for (int i = 0; i < beats.length; i++) {
       final beat = beats[i];
-      if (beat == null) continue;
-      if (beat <= currentSeconds) {
+      if (beat == null || beat > currentSeconds) continue;
+
+      if (closestPastBeat == null || beat >= closestPastBeat) {
+        closestPastBeat = beat;
         index = i;
-      } else {
-        break;
       }
     }
 
@@ -383,7 +385,7 @@ class _DeChordResultPageState extends State<DeChordResultPage> {
               const SizedBox(height: 18),
               _ResultSummarySection(result: widget.result),
               const SizedBox(height: 14),
-              _ResultChordGrid(
+              _ResultChordTimeline(
                 result: widget.result,
                 activeIndex: _activeBeatIndex,
               ),
@@ -568,20 +570,42 @@ class _ResultSummarySection extends StatelessWidget {
   }
 }
 
-class _GridCell {
-  const _GridCell({
+class _TimelineBeatCellModel {
+  const _TimelineBeatCellModel({
     required this.label,
     required this.index,
-    required this.isFilled,
+    required this.beatInMeasure,
   });
 
   final String label;
   final int index;
-  final bool isFilled;
+  final int beatInMeasure;
+
+  bool get isFilled => label.trim().isNotEmpty;
+
+  _TimelineBeatCellModel copyWith({String? label}) {
+    return _TimelineBeatCellModel(
+      label: label ?? this.label,
+      index: index,
+      beatInMeasure: beatInMeasure,
+    );
+  }
 }
 
-class _ResultChordGrid extends StatefulWidget {
-  const _ResultChordGrid({
+class _TimelineMeasureModel {
+  const _TimelineMeasureModel({
+    required this.measureNumber,
+    required this.startBeatIndex,
+    required this.cells,
+  });
+
+  final int measureNumber;
+  final int startBeatIndex;
+  final List<_TimelineBeatCellModel> cells;
+}
+
+class _ResultChordTimeline extends StatefulWidget {
+  const _ResultChordTimeline({
     required this.result,
     required this.activeIndex,
   });
@@ -590,26 +614,37 @@ class _ResultChordGrid extends StatefulWidget {
   final int activeIndex;
 
   @override
-  State<_ResultChordGrid> createState() => _ResultChordGridState();
+  State<_ResultChordTimeline> createState() => _ResultChordTimelineState();
 }
 
-class _ResultChordGridState extends State<_ResultChordGrid> {
-  static const int _columnsPerRow = 4;
-  static const double _rowHeight = 52;
-  static const double _rowGap = 6;
+class _ResultChordTimelineState extends State<_ResultChordTimeline> {
+  static const double _rowExtent = 66;
+  static const int _longSongThreshold = 480;
 
   final ScrollController _scrollController = ScrollController();
-  int _lastFollowedRow = -1;
+  int _lastFollowedMeasure = -1;
+  late List<_TimelineMeasureModel> _measures;
+
+  int get _beatsPerMeasure => widget.result.timeSignature <= 0 ? 4 : widget.result.timeSignature;
+
+  bool get _compactMode => widget.result.displayChords.length >= _longSongThreshold;
 
   @override
   void initState() {
     super.initState();
+    _measures = _buildMeasures(widget.result.displayChords, _beatsPerMeasure);
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollWithActive(force: true));
   }
 
   @override
-  void didUpdateWidget(covariant _ResultChordGrid oldWidget) {
+  void didUpdateWidget(covariant _ResultChordTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.result.displayChords != widget.result.displayChords ||
+        oldWidget.result.timeSignature != widget.result.timeSignature) {
+      _measures = _buildMeasures(widget.result.displayChords, _beatsPerMeasure);
+      _lastFollowedMeasure = -1;
+    }
+
     if (oldWidget.activeIndex != widget.activeIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _syncScrollWithActive());
     }
@@ -622,45 +657,37 @@ class _ResultChordGridState extends State<_ResultChordGrid> {
   }
 
   void _syncScrollWithActive({bool force = false}) {
-    if (!_scrollController.hasClients) return;
+    if (!_scrollController.hasClients || _measures.isEmpty) return;
 
-    final rowIndex = widget.activeIndex ~/ _columnsPerRow;
-    if (!force && rowIndex == _lastFollowedRow) return;
+    final active = widget.activeIndex.clamp(0, widget.result.displayChords.isEmpty ? 0 : widget.result.displayChords.length - 1);
+    final measureIndex = active ~/ _beatsPerMeasure;
+    if (!force && measureIndex == _lastFollowedMeasure) return;
 
     final position = _scrollController.position;
-    final rowSpan = _rowHeight + _rowGap;
     final viewportHeight = position.viewportDimension;
-
     if (viewportHeight <= 0) return;
 
-    final rowTop = rowIndex * rowSpan;
-    final rowBottom = rowTop + _rowHeight;
+    final rowTop = measureIndex * _rowExtent;
+    final rowBottom = rowTop + _rowExtent;
     final visibleTop = position.pixels;
     final visibleBottom = visibleTop + viewportHeight;
+    final safeTop = visibleTop + (viewportHeight * 0.20);
+    final safeBottom = visibleBottom - (viewportHeight * 0.28);
 
-    // Keep active row in a comfortable band instead of hard-centering to avoid big jumps.
-    final safeTop = visibleTop + (viewportHeight * 0.18);
-    final safeBottom = visibleBottom - (viewportHeight * 0.30);
-    final rowOutsideBand = rowTop < safeTop || rowBottom > safeBottom;
-
-    if (force || rowOutsideBand) {
-      final targetOffset = rowTop - (viewportHeight * 0.24);
-      final clamped = targetOffset.clamp(0.0, position.maxScrollExtent);
-
+    if (force || rowTop < safeTop || rowBottom > safeBottom) {
+      final target = (rowTop - (viewportHeight * 0.22)).clamp(0.0, position.maxScrollExtent);
       _scrollController.animateTo(
-        clamped,
-        duration: const Duration(milliseconds: 160),
+        target,
+        duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
       );
     }
 
-    _lastFollowedRow = rowIndex;
+    _lastFollowedMeasure = measureIndex;
   }
 
   @override
   Widget build(BuildContext context) {
-    final gridCells = _buildGridCells(widget.result.displayChords);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -673,40 +700,46 @@ class _ResultChordGridState extends State<_ResultChordGrid> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Lưới hợp âm (${widget.result.displayChords.length} beat)',
+            'Timeline hợp âm (${widget.result.displayChords.length} beat)',
             style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _LegendChip(text: 'Đang chạy', color: const Color(0xFF2F5FDD)),
+              _LegendChip(text: 'Beat 1', color: const Color(0xFFFF923E)),
+              _LegendChip(text: 'N/C', color: const Color(0xFF3A3A3A)),
+              if (_compactMode) _LegendChip(text: 'Chế độ mượt cho bài dài', color: const Color(0xFF2D2D2D)),
+            ],
+          ),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 390,
-            child: SingleChildScrollView(
+            height: 406,
+            child: ListView.builder(
               controller: _scrollController,
-              child: Column(
-                children: [
-                  for (int row = 0; row < gridCells.length; row += _columnsPerRow) ...[
-                    Row(
-                      children: [
-                        for (int col = 0; col < _columnsPerRow; col++) ...[
-                          Expanded(
-                            child: _ChordGridCell(
-                              label: gridCells[row + col].label,
-                              isFilled: gridCells[row + col].isFilled,
-                              isActive: gridCells[row + col].index == widget.activeIndex,
-                              isMeasureStart: col == 0,
-                            ),
-                          ),
-                          if (col != _columnsPerRow - 1) const SizedBox(width: 4),
-                        ],
-                      ],
-                    ),
-                    if (row + _columnsPerRow < gridCells.length) const SizedBox(height: _rowGap),
-                  ],
-                ],
-              ),
+              itemCount: _measures.length,
+              itemExtent: _rowExtent,
+              cacheExtent: _rowExtent * 10,
+              itemBuilder: (context, index) {
+                final measure = _measures[index];
+                final active = widget.activeIndex.clamp(
+                  0,
+                  widget.result.displayChords.isEmpty ? 0 : widget.result.displayChords.length - 1,
+                );
+                return RepaintBoundary(
+                  child: _TimelineMeasureRow(
+                    measure: measure,
+                    activeIndex: active,
+                    compactMode: _compactMode,
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -714,49 +747,149 @@ class _ResultChordGridState extends State<_ResultChordGrid> {
     );
   }
 
-  List<_GridCell> _buildGridCells(List<String> labels) {
-    final cells = <_GridCell>[];
-    for (int i = 0; i < labels.length; i++) {
-      final label = labels[i];
-      cells.add(_GridCell(label: label, index: i, isFilled: label.trim().isNotEmpty));
+  List<_TimelineMeasureModel> _buildMeasures(List<String> labels, int beatsPerMeasure) {
+    final normalizedBeatsPerMeasure = beatsPerMeasure <= 0 ? 4 : beatsPerMeasure;
+    final measures = <_TimelineMeasureModel>[];
+    if (labels.isEmpty) {
+      measures.add(
+        _TimelineMeasureModel(
+          measureNumber: 1,
+          startBeatIndex: 0,
+          cells: [
+            for (int beat = 0; beat < normalizedBeatsPerMeasure; beat++)
+              _TimelineBeatCellModel(label: '', index: beat, beatInMeasure: beat + 1),
+          ],
+        ),
+      );
+      return measures;
     }
 
-    while (cells.isEmpty || cells.length % _columnsPerRow != 0) {
-      cells.add(_GridCell(label: '', index: cells.length, isFilled: false));
+    for (int start = 0; start < labels.length; start += normalizedBeatsPerMeasure) {
+      final cells = <_TimelineBeatCellModel>[];
+      String measureFirstChord = '';
+      
+      for (int offset = 0; offset < normalizedBeatsPerMeasure; offset++) {
+        final beatIndex = start + offset;
+        final label = beatIndex < labels.length ? labels[beatIndex] : '';
+        
+        if (offset == 0 && label.isNotEmpty) {
+          measureFirstChord = label;
+        }
+        
+        cells.add(
+          _TimelineBeatCellModel(
+            label: label,
+            index: beatIndex,
+            beatInMeasure: offset + 1,
+          ),
+        );
+      }
+
+      // Guarantee ≥1 chord per measure: if all empty, use first non-empty from earlier
+      if (measureFirstChord.isEmpty) {
+        for (int j = start - 1; j >= 0; j--) {
+          if (labels[j].isNotEmpty) {
+            measureFirstChord = labels[j];
+            break;
+          }
+        }
+        if (measureFirstChord.isNotEmpty && cells.first.label.isEmpty) {
+          cells[0] = cells[0].copyWith(label: measureFirstChord);
+        }
+      }
+
+      measures.add(
+        _TimelineMeasureModel(
+          measureNumber: (start ~/ normalizedBeatsPerMeasure) + 1,
+          startBeatIndex: start,
+          cells: cells,
+        ),
+      );
     }
 
-    return cells;
+    return measures;
   }
 }
 
-class _ChordGridCell extends StatelessWidget {
-  const _ChordGridCell({
-    required this.label,
-    required this.isFilled,
-    required this.isActive,
-    required this.isMeasureStart,
+class _TimelineMeasureRow extends StatelessWidget {
+  const _TimelineMeasureRow({
+    required this.measure,
+    required this.activeIndex,
+    required this.compactMode,
   });
 
-  final String label;
-  final bool isFilled;
-  final bool isActive;
-  final bool isMeasureStart;
+  final _TimelineMeasureModel measure;
+  final int activeIndex;
+  final bool compactMode;
 
   @override
   Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 56,
+            child: Text(
+              'Ô ${measure.measureNumber}',
+              style: GoogleFonts.manrope(
+                color: const Color(0xFF8A8A8A),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              children: [
+                for (int i = 0; i < measure.cells.length; i++) ...[
+                  Expanded(
+                    child: _TimelineBeatCell(
+                      cell: measure.cells[i],
+                      isActive: measure.cells[i].index == activeIndex,
+                      compactMode: compactMode,
+                    ),
+                  ),
+                  if (i != measure.cells.length - 1) const SizedBox(width: 4),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineBeatCell extends StatelessWidget {
+  const _TimelineBeatCell({
+    required this.cell,
+    required this.isActive,
+    required this.compactMode,
+  });
+
+  final _TimelineBeatCellModel cell;
+  final bool isActive;
+  final bool compactMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = cell.label.trim();
+    final isNc = trimmed == 'N/C';
     final bgColor = isActive
         ? const Color(0xFF2F5FDD)
-        : (isFilled ? const Color(0xFF1D1D1D) : const Color(0xFF2A2A2A));
+        : (!cell.isFilled ? const Color(0xFF2A2A2A) : (isNc ? const Color(0xFF222222) : const Color(0xFF1A1A1A)));
 
     return Container(
-      height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      height: 52,
+      padding: EdgeInsets.symmetric(horizontal: compactMode ? 4 : 6, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
         border: Border(
           left: BorderSide(
-            width: isMeasureStart ? 3 : 1,
-            color: isMeasureStart ? const Color(0xFFFF923E) : const Color(0xFF4A4A4A),
+            width: cell.beatInMeasure == 1 ? 3 : 1,
+            color: cell.beatInMeasure == 1 ? const Color(0xFFFF923E) : const Color(0xFF4A4A4A),
           ),
           right: const BorderSide(width: 1, color: Color(0xFF4A4A4A)),
           top: const BorderSide(width: 1, color: Color(0xFF4A4A4A)),
@@ -764,18 +897,74 @@ class _ChordGridCell extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${cell.beatInMeasure}',
+            style: GoogleFonts.manrope(
+              color: isActive ? Colors.white : const Color(0xFF9D9D9D),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
+          const SizedBox(height: 3),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Text(
+                trimmed,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  color: isActive
+                      ? Colors.white
+                      : (isNc ? const Color(0xFFB7B7B7) : (cell.isFilled ? Colors.white : const Color(0xFF7D7D7D))),
+                  fontSize: compactMode ? 11 : 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1B1B),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color.fromRGBO(255, 255, 255, 0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: GoogleFonts.manrope(
+              color: const Color(0xFFDFDFDF),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -858,24 +1047,6 @@ class DechordAnalyzeResult {
       return trimmed;
     }
 
-    final output = <String>[];
-    String previous = '';
-
-    for (final item in labels) {
-      final next = normalize(item);
-      if (next.isEmpty) {
-        output.add('');
-        continue;
-      }
-
-      if (next == previous) {
-        output.add('');
-      } else {
-        output.add(next);
-        previous = next;
-      }
-    }
-
-    return output;
+    return labels.map(normalize).toList();
   }
 }

@@ -14,7 +14,7 @@ async def get_recommended_songs(limit: int = Query(default=10, ge=1, le=50)) -> 
     rows = await fetch(
         """
         select id, title, artist, thumbnail_url, youtube_url, source_url, source_song_id,
-               key_original, rhythm_name, chord_set, lyrics
+             key_original, rhythm_name, note, chord_set, lyrics
         from songs
         where title is not null and title <> ''
         order by created_at desc, title asc

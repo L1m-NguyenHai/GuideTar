@@ -8,8 +8,32 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:guidetar/data/auth_session.dart';
+import 'package:guidetar/data/backend_api.dart';
+import 'package:guidetar/main.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/dechord_result_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
+
+class _AnalyzeSessionCache {
+  static bool showAnalyzePopup = false;
+  static bool isProcessing = false;
+  static int processingElapsedSeconds = 0;
+  static int processingStepIndex = 0;
+  static bool analysisReady = false;
+  static String? analysisPopupError;
+
+  static Map<String, dynamic>? readyResultPayload;
+  static String? selectedFileName;
+  static String? selectedThumbnailUrl;
+  static bool selectedIsYoutube = false;
+
+  static String? readyFileName;
+  static String? readyFilePath;
+  static Uint8List? readyFileBytes;
+  static bool readyIsYoutubeSource = false;
+  static String? readyYoutubeUrl;
+  static String? readyYoutubeThumbnailUrl;
+}
 
 class DeChordPage extends StatefulWidget {
   const DeChordPage({super.key});
@@ -19,6 +43,11 @@ class DeChordPage extends StatefulWidget {
 }
 
 class _DeChordPageState extends State<DeChordPage> {
+  static const String _configuredBaseUrl = String.fromEnvironment(
+    'BACKEND_BASE_URL',
+    defaultValue: '',
+  );
+
   static const List<String> _processingSteps = [
     'Đang chuẩn bị dữ liệu âm thanh...',
     'Đang upload file lên AI backend...',
@@ -37,12 +66,83 @@ class _DeChordPageState extends State<DeChordPage> {
   String? _selectedThumbnailUrl;
   bool _isYoutubeAnalyze = false;
   String? _errorMessage;
+  bool _isLoadingRecent = true;
+  String? _recentError;
+  List<Map<String, dynamic>> _recentAnalyses = const [];
+
+  bool _showAnalyzePopup = false;
+  bool _analysisReady = false;
+  String? _analysisPopupError;
+  DechordAnalyzeResult? _readyResult;
+  Map<String, dynamic>? _readyResultPayload;
+  bool _deferRecentLoadUntilAnalyzeDone = false;
+  String? _readyFileName;
+  String? _readyFilePath;
+  Uint8List? _readyFileBytes;
+  bool _readyIsYoutubeSource = false;
+  String? _readyYoutubeUrl;
+  String? _readyYoutubeThumbnailUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreAnalyzeSessionCache();
+    if (_isProcessing) {
+      _deferRecentLoadUntilAnalyzeDone = true;
+      _startProcessingTicker();
+    } else {
+      _loadRecentAnalyses();
+    }
+  }
 
   @override
   void dispose() {
+    _saveAnalyzeSessionCache();
     _stopProcessingTicker();
     _youtubeUrlController.dispose();
     super.dispose();
+  }
+
+  void _restoreAnalyzeSessionCache() {
+    _showAnalyzePopup = _AnalyzeSessionCache.showAnalyzePopup;
+    _isProcessing = _AnalyzeSessionCache.isProcessing;
+    _processingElapsedSeconds = _AnalyzeSessionCache.processingElapsedSeconds;
+    _processingStepIndex = _AnalyzeSessionCache.processingStepIndex;
+    _analysisReady = _AnalyzeSessionCache.analysisReady;
+    _analysisPopupError = _AnalyzeSessionCache.analysisPopupError;
+
+    final payload = _AnalyzeSessionCache.readyResultPayload;
+    _readyResultPayload = payload;
+    _readyResult = payload == null ? null : DechordAnalyzeResult.fromJson(payload);
+    _selectedFileName = _AnalyzeSessionCache.selectedFileName;
+    _selectedThumbnailUrl = _AnalyzeSessionCache.selectedThumbnailUrl;
+    _isYoutubeAnalyze = _AnalyzeSessionCache.selectedIsYoutube;
+    _readyFileName = _AnalyzeSessionCache.readyFileName;
+    _readyFilePath = _AnalyzeSessionCache.readyFilePath;
+    _readyFileBytes = _AnalyzeSessionCache.readyFileBytes;
+    _readyIsYoutubeSource = _AnalyzeSessionCache.readyIsYoutubeSource;
+    _readyYoutubeUrl = _AnalyzeSessionCache.readyYoutubeUrl;
+    _readyYoutubeThumbnailUrl = _AnalyzeSessionCache.readyYoutubeThumbnailUrl;
+  }
+
+  void _saveAnalyzeSessionCache() {
+    _AnalyzeSessionCache.showAnalyzePopup = _showAnalyzePopup;
+    _AnalyzeSessionCache.isProcessing = _isProcessing;
+    _AnalyzeSessionCache.processingElapsedSeconds = _processingElapsedSeconds;
+    _AnalyzeSessionCache.processingStepIndex = _processingStepIndex;
+    _AnalyzeSessionCache.analysisReady = _analysisReady;
+    _AnalyzeSessionCache.analysisPopupError = _analysisPopupError;
+
+    _AnalyzeSessionCache.readyResultPayload = _readyResultPayload;
+    _AnalyzeSessionCache.selectedFileName = _selectedFileName;
+    _AnalyzeSessionCache.selectedThumbnailUrl = _selectedThumbnailUrl;
+    _AnalyzeSessionCache.selectedIsYoutube = _isYoutubeAnalyze;
+    _AnalyzeSessionCache.readyFileName = _readyFileName;
+    _AnalyzeSessionCache.readyFilePath = _readyFilePath;
+    _AnalyzeSessionCache.readyFileBytes = _readyFileBytes;
+    _AnalyzeSessionCache.readyIsYoutubeSource = _readyIsYoutubeSource;
+    _AnalyzeSessionCache.readyYoutubeUrl = _readyYoutubeUrl;
+    _AnalyzeSessionCache.readyYoutubeThumbnailUrl = _readyYoutubeThumbnailUrl;
   }
 
   void _onNavChanged(int index) {
@@ -111,6 +211,8 @@ class _DeChordPageState extends State<DeChordPage> {
   }
 
   Future<void> _analyzeSelectedSong() async {
+    if (_isProcessing) return;
+
     final selected = _selectedFile;
     if (selected == null) {
       setState(() {
@@ -136,6 +238,8 @@ class _DeChordPageState extends State<DeChordPage> {
   }
 
   Future<void> _analyzeYoutubeUrl() async {
+    if (_isProcessing) return;
+
     final url = _youtubeUrlController.text.trim();
     if (url.isEmpty) {
       setState(() {
@@ -186,6 +290,11 @@ class _DeChordPageState extends State<DeChordPage> {
   }) async {
     setState(() {
       _isProcessing = true;
+      _showAnalyzePopup = true;
+      _analysisReady = false;
+      _analysisPopupError = null;
+      _readyResult = null;
+      _readyResultPayload = null;
       _selectedFileName = displayName;
       if (resultThumbnailUrl != null) {
         _selectedThumbnailUrl = resultThumbnailUrl;
@@ -195,72 +304,146 @@ class _DeChordPageState extends State<DeChordPage> {
       _processingElapsedSeconds = 0;
       _processingStepIndex = 0;
     });
+    _saveAnalyzeSessionCache();
+    getAnalyzeSessionNotifier().startAnalyze(displayName, resultThumbnailUrl, resultIsYoutubeSource);
 
     _startProcessingTicker();
 
     try {
       final payload = await _analyzeWithFallback(selected: selected, youtubeUrl: youtubeUrl);
       final nextResult = DechordAnalyzeResult.fromJson(payload);
-      if (!mounted) return;
 
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => DeChordResultPage(
-            result: nextResult,
-            fileName: resultFileName,
-            filePath: resultFilePath,
-            fileBytes: resultFileBytes,
-            isYoutubeSource: resultIsYoutubeSource,
-            youtubeUrl: resultYoutubeUrl,
-            youtubeThumbnailUrl: resultThumbnailUrl,
-          ),
-        ),
-      );
+      _AnalyzeSessionCache.analysisReady = true;
+      _AnalyzeSessionCache.analysisPopupError = null;
+      _AnalyzeSessionCache.readyResultPayload = payload;
+      _readyResultPayload = payload;
+      _AnalyzeSessionCache.readyFileName = resultFileName;
+      _AnalyzeSessionCache.readyFilePath = resultFilePath;
+      _AnalyzeSessionCache.readyFileBytes = resultFileBytes;
+      _AnalyzeSessionCache.readyIsYoutubeSource = resultIsYoutubeSource;
+      _AnalyzeSessionCache.readyYoutubeUrl = resultYoutubeUrl;
+      _AnalyzeSessionCache.readyYoutubeThumbnailUrl = resultThumbnailUrl;
+
+      if (mounted) {
+        setState(() {
+          _analysisReady = true;
+          _analysisPopupError = null;
+          _readyResult = nextResult;
+          _readyFileName = resultFileName;
+          _readyFilePath = resultFilePath;
+          _readyFileBytes = resultFileBytes;
+          _readyIsYoutubeSource = resultIsYoutubeSource;
+          _readyYoutubeUrl = resultYoutubeUrl;
+          _readyYoutubeThumbnailUrl = resultThumbnailUrl;
+        });
+      }
+      getAnalyzeSessionNotifier().finishAnalyzeSuccess();
     } on TimeoutException {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Request bị timeout. Kiểm tra backend rồi thử lại.';
-      });
+      _AnalyzeSessionCache.analysisPopupError = 'Request bị timeout. Kiểm tra backend rồi thử lại.';
+      if (mounted) {
+        setState(() {
+          _analysisPopupError = 'Request bị timeout. Kiểm tra backend rồi thử lại.';
+        });
+      }
+      getAnalyzeSessionNotifier().finishAnalyzeError('Request bị timeout. Kiểm tra backend rồi thử lại.');
     } catch (error) {
-      if (!mounted) return;
       final message = error.toString().replaceFirst('Exception: ', '');
-      setState(() {
-        _errorMessage = '$message\nGợi ý: đảm bảo GuideTarBackend đang chạy ở cổng 8000.';
-      });
+      final fullMessage = '$message\nGợi ý: đảm bảo GuideTarBackend đang chạy ở cổng 8000.';
+      _AnalyzeSessionCache.analysisPopupError = fullMessage;
+      if (mounted) {
+        setState(() {
+          _analysisPopupError = fullMessage;
+        });
+      }
+      getAnalyzeSessionNotifier().finishAnalyzeError(fullMessage);
     } finally {
+      _AnalyzeSessionCache.isProcessing = false;
       _stopProcessingTicker();
       if (mounted) {
         setState(() {
           _isProcessing = false;
         });
       }
+      if (_deferRecentLoadUntilAnalyzeDone) {
+        _deferRecentLoadUntilAnalyzeDone = false;
+        unawaited(_loadRecentAnalyses(silent: true));
+      }
     }
   }
 
-  void _resetProcessing() {
-    _stopProcessingTicker();
+  // ignore: unused_element
+  Future<void> _openReadyResultPage() async {
+    final result = _readyResult;
+    if (result == null) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeChordResultPage(
+          result: result,
+          fileName: _readyFileName,
+          filePath: _readyFilePath,
+          fileBytes: _readyFileBytes,
+          isYoutubeSource: _readyIsYoutubeSource,
+          youtubeUrl: _readyYoutubeUrl,
+          youtubeThumbnailUrl: _readyYoutubeThumbnailUrl,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
     setState(() {
-      _isProcessing = false;
-      _errorMessage = null;
-      _selectedFile = null;
-      _selectedFileName = null;
-      _selectedThumbnailUrl = null;
-      _isYoutubeAnalyze = false;
-      _processingElapsedSeconds = 0;
-      _processingStepIndex = 0;
+      _showAnalyzePopup = false;
+      _analysisReady = false;
+      _analysisPopupError = null;
+      _readyResult = null;
+      _readyResultPayload = null;
     });
+    _saveAnalyzeSessionCache();
+    getAnalyzeSessionNotifier().resetAll();
+  }
+
+  // ignore: unused_element
+  void _dismissAnalyzePopup() {
+    setState(() {
+      _showAnalyzePopup = false;
+      _analysisReady = false;
+      _analysisPopupError = null;
+      _readyResult = null;
+      _readyResultPayload = null;
+    });
+    _saveAnalyzeSessionCache();
   }
 
   void _startProcessingTicker() {
     _processingTicker?.cancel();
     _processingTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_isProcessing) return;
-      setState(() {
-        _processingElapsedSeconds += 1;
-        if (_processingElapsedSeconds % 4 == 0 && _processingStepIndex < _processingSteps.length - 1) {
-          _processingStepIndex += 1;
-        }
-      });
+      if (!_isProcessing) return;
+
+      _processingElapsedSeconds += 1;
+      if (_processingElapsedSeconds % 4 == 0 && _processingStepIndex < _processingSteps.length - 1) {
+        _processingStepIndex += 1;
+      }
+
+      getAnalyzeSessionNotifier().updateProgress(
+        _processingSteps[_processingStepIndex],
+        _processingElapsedSeconds,
+      );
+
+      if (_processingElapsedSeconds >= 300) {
+        _isProcessing = false;
+        _analysisPopupError = 'Xử lý quá lâu (>300s). Vui lòng thử lại.';
+        _AnalyzeSessionCache.isProcessing = false;
+        _AnalyzeSessionCache.analysisPopupError = _analysisPopupError;
+        _stopProcessingTicker();
+        getAnalyzeSessionNotifier().finishAnalyzeError('Xử lý quá lâu (>300s). Vui lòng thử lại.');
+      }
+
+      _AnalyzeSessionCache.processingElapsedSeconds = _processingElapsedSeconds;
+      _AnalyzeSessionCache.processingStepIndex = _processingStepIndex;
+
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -270,12 +453,19 @@ class _DeChordPageState extends State<DeChordPage> {
   }
 
   List<String> _candidateApiBaseUrls() {
+    String normalize(String value) => value.endsWith('/') ? value.substring(0, value.length - 1) : value;
+
+    final configured = _configuredBaseUrl.trim();
+    if (configured.isNotEmpty) {
+      return <String>[normalize(configured)];
+    }
+
     final urls = <String>[];
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       urls.add('http://10.0.2.2:8000');
     }
     urls.add('http://localhost:8000');
-    return urls.toSet().toList(growable: false);
+    return urls.map(normalize).toSet().toList(growable: false);
   }
 
   Future<Map<String, dynamic>> _analyzeWithFallback({
@@ -298,6 +488,56 @@ class _DeChordPageState extends State<DeChordPage> {
     throw lastError ?? Exception('Không thể kết nối tới backend.');
   }
 
+  Future<void> _loadRecentAnalyses({bool silent = false}) async {
+    if (_isProcessing) {
+      _deferRecentLoadUntilAnalyzeDone = true;
+      return;
+    }
+
+    if (!silent) {
+      setState(() {
+        _isLoadingRecent = true;
+        _recentError = null;
+      });
+    }
+
+    try {
+      final items = await BackendApi.getAnalyzeHistory();
+      if (!mounted) return;
+      setState(() {
+        _recentAnalyses = items;
+        _recentError = null;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _recentAnalyses = const [];
+        _recentError = error.statusCode == 401
+            ? 'Đăng nhập để xem lịch sử DeChord gần đây.'
+            : error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _recentAnalyses = const [];
+        _recentError = 'Không tải được lịch sử gần đây.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingRecent = false;
+        });
+      }
+    }
+  }
+
+  String _formatRecentDate(dynamic value) {
+    final parsed = DateTime.tryParse((value ?? '').toString());
+    if (parsed == null) return '--/--';
+    final local = parsed.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}';
+  }
+
   Future<Map<String, dynamic>> _sendAnalyzeRequest({
     required String baseUrl,
     PlatformFile? selected,
@@ -307,6 +547,10 @@ class _DeChordPageState extends State<DeChordPage> {
       'POST',
       Uri.parse('$baseUrl/api/analyze'),
     );
+    final accessToken = AuthSession.accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $accessToken';
+    }
     request.fields['include_logs'] = 'false';
 
     if (youtubeUrl != null && youtubeUrl.isNotEmpty) {
@@ -331,14 +575,18 @@ class _DeChordPageState extends State<DeChordPage> {
       throw Exception('Không có dữ liệu hợp lệ để gửi lên backend.');
     }
 
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 120));
+    final streamedResponse = await request.send().timeout(const Duration(seconds: 300));
     final body = await streamedResponse.stream.bytesToString();
 
     Map<String, dynamic> payload;
     try {
-      payload = jsonDecode(body) as Map<String, dynamic>;
-    } catch (_) {
-      throw Exception('Backend trả về dữ liệu không hợp lệ.');
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Backend không trả về object JSON hợp lệ.');
+      }
+      payload = decoded;
+    } catch (error) {
+      throw Exception('Backend trả về dữ liệu không hợp lệ: $error');
     }
 
     if (streamedResponse.statusCode < 200 || streamedResponse.statusCode >= 300) {
@@ -376,27 +624,6 @@ class _DeChordPageState extends State<DeChordPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isProcessing) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0E0E0E),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
-            child: Center(
-              child: _ProcessingSection(
-                fileName: _selectedFileName,
-                thumbnailUrl: _selectedThumbnailUrl,
-                isYoutubeSource: _isYoutubeAnalyze,
-                processingStep: _processingSteps[_processingStepIndex],
-                elapsedSeconds: _processingElapsedSeconds,
-                onCancel: _resetProcessing,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0E),
       body: SafeArea(
@@ -471,28 +698,50 @@ class _DeChordPageState extends State<DeChordPage> {
                           height: 28 / 18,
                         ),
                       ),
-                      Text(
-                        'XEM TẤT CẢ',
-                        style: GoogleFonts.manrope(
-                          color: const Color(0xFFFF923E),
-                          fontSize: 12,
-                          letterSpacing: 1.2,
+                      GestureDetector(
+                        onTap: (_isLoadingRecent || _isProcessing) ? null : () => _loadRecentAnalyses(),
+                        child: Text(
+                          _isProcessing ? 'ĐANG XỬ LÝ' : 'LÀM MỚI',
+                          style: GoogleFonts.manrope(
+                            color: const Color(0xFFFF923E),
+                            fontSize: 12,
+                            letterSpacing: 1.2,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const _RecentSongItem(
-                    imageAsset: 'assets/images/dechord_recent_song_1.png',
-                    title: 'Có Chàng Trai Viết Lên Cây',
-                    subtitle: 'Phan Mạnh Quỳnh • 5:04',
-                  ),
-                  const SizedBox(height: 12),
-                  const _RecentSongItem(
-                    imageAsset: 'assets/images/dechord_recent_song_2.png',
-                    title: 'Nước Ngoài',
-                    subtitle: 'Phan Mạnh Quỳnh • 4:18',
-                  ),
+                  if (_isLoadingRecent)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_recentError != null)
+                    _InlineErrorCard(message: _recentError!)
+                  else if (_recentAnalyses.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131313),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Text(
+                        'Chưa có bài nào được xử lý gần đây.',
+                        style: GoogleFonts.manrope(
+                          color: const Color(0xFFADAAAA),
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  else
+                    for (int i = 0; i < _recentAnalyses.length && i < 5; i++) ...[
+                      _RecentSongItem(
+                        sourceType: (_recentAnalyses[i]['source_type'] ?? 'file').toString(),
+                        title: (_recentAnalyses[i]['source_name'] ?? 'Bài hát không tên').toString(),
+                        subtitle:
+                            '${_formatRecentDate(_recentAnalyses[i]['created_at'])} • ${(_recentAnalyses[i]['chord_count'] ?? 0)} chords',
+                      ),
+                      if (i < 4 && i < _recentAnalyses.length - 1) const SizedBox(height: 12),
+                    ],
                   const SizedBox(height: 20),
                   Row(
                     children: const [
@@ -809,148 +1058,7 @@ class _InlineErrorCard extends StatelessWidget {
   }
 }
 
-class _ProcessingSection extends StatelessWidget {
-  const _ProcessingSection({
-    required this.fileName,
-    required this.thumbnailUrl,
-    required this.isYoutubeSource,
-    required this.processingStep,
-    required this.elapsedSeconds,
-    required this.onCancel,
-  });
-
-  final String? fileName;
-  final String? thumbnailUrl;
-  final bool isYoutubeSource;
-  final String processingStep;
-  final int elapsedSeconds;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF20201F),
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white, width: 3),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Đang xử lý',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  height: 28 / 18,
-                ),
-              ),
-              Text(
-                'AI DeChord',
-                style: GoogleFonts.manrope(
-                  color: const Color(0xFFFF923E),
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                  height: 16 / 12,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF262626),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: _SelectedFileCover(
-                    fileName: fileName,
-                    thumbnailUrl: thumbnailUrl,
-                    isYoutubeSource: isYoutubeSource,
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fileName ?? 'Đang tải lên...',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          height: 24 / 16,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(9999),
-                        child: const SizedBox(
-                          height: 8,
-                          child: LinearProgressIndicator(
-                            backgroundColor: Color(0xFF262626),
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF923E)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '$processingStep ($elapsedSeconds s)',
-                        style: GoogleFonts.manrope(
-                          color: const Color(0xFF767575),
-                          fontSize: 10,
-                          letterSpacing: 0.5,
-                          height: 15 / 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: onCancel,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF262626),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Text(
-                  'Quay lại',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+// ignore: unused_element
 class _SelectedFileCover extends StatelessWidget {
   const _SelectedFileCover({
     required this.fileName,
@@ -989,6 +1097,7 @@ class _SelectedFileCover extends StatelessWidget {
     return _buildFallback();
   }
 
+  // ignore: unused_element
   Widget _buildFallback() {
     final safeName = (fileName ?? 'Audio').trim();
     final initials = safeName.isEmpty ? 'A' : safeName[0].toUpperCase();
@@ -1030,17 +1139,18 @@ class _SelectedFileCover extends StatelessWidget {
 
 class _RecentSongItem extends StatelessWidget {
   const _RecentSongItem({
-    required this.imageAsset,
+    required this.sourceType,
     required this.title,
     required this.subtitle,
   });
 
-  final String imageAsset;
+  final String sourceType;
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final isYoutube = sourceType.toLowerCase() == 'youtube';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1049,9 +1159,18 @@ class _RecentSongItem extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(imageAsset, width: 64, height: 64, fit: BoxFit.cover),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(255, 146, 62, 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isYoutube ? Icons.play_circle_fill_rounded : Icons.music_note_rounded,
+              color: const Color(0xFFFF923E),
+              size: 30,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1060,6 +1179,8 @@ class _RecentSongItem extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white,
                     fontSize: 16,
@@ -1068,6 +1189,8 @@ class _RecentSongItem extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.manrope(
                     color: const Color(0xFFADAAAA),
                     fontSize: 12,
@@ -1083,7 +1206,7 @@ class _RecentSongItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
-              'Completed',
+              isYoutube ? 'YouTube' : 'Local',
               style: GoogleFonts.manrope(
                 color: const Color(0xFFFF923E),
                 fontSize: 10,

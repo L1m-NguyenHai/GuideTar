@@ -3,6 +3,7 @@ alter table songs
     add column if not exists source_url text,
     add column if not exists key_original text,
     add column if not exists rhythm_name text,
+    add column if not exists note text,
     add column if not exists chord_set text,
     add column if not exists lyrics text;
 

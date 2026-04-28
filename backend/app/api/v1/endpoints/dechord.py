@@ -34,12 +34,12 @@ async def analyze_audio(
 async def analyze_history(current_user: UserMeResponse = Depends(get_current_user)) -> list[AnalyzeHistoryItem]:
     rows = await fetch(
         """
-        select id, source_type, source_name, source_url, bpm, time_signature,
+        select id::text as id, source_type, source_name, source_url, bpm, time_signature,
                chord_count, raw_chord_count, created_at
         from dechord_analyses
         where user_id = $1
         order by created_at desc
-        limit 50
+        limit 5
         """,
         current_user.id,
     )

@@ -5,10 +5,11 @@ import logging
 import re
 import time
 import unicodedata
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from pathlib import Path
 
-from yt_dlp import YoutubeDL
+if TYPE_CHECKING:
+    from yt_dlp import YoutubeDL
 
 
 def _build_query(title: str, artists: str) -> str:
@@ -86,6 +87,8 @@ def _extract_video_and_thumbnail(entry: dict) -> tuple[str, str]:
 
 
 def _search_youtube_best(query: str, title: str, artists: str, max_results: int = 5) -> tuple[str, str]:
+    from yt_dlp import YoutubeDL
+
     ydl_opts: dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,

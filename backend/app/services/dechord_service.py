@@ -481,6 +481,9 @@ async def save_analysis_history(
         return
 
     user_id = optional_user_id(request)
+    if user_id is None:
+        return
+
     analysis_id = str(uuid4())
     beat_detection = response.get("beatDetectionResult")
     detected_bpm = None
@@ -524,6 +527,21 @@ async def save_analysis_history(
             beat_value,
             chord,
         )
+
+    await execute(
+        """
+        delete from dechord_analyses
+        where user_id = $1
+          and id in (
+              select id
+              from dechord_analyses
+              where user_id = $1
+              order by created_at desc
+              offset 5
+          )
+        """,
+        user_id,
+    )
 
 
 async def analyze_audio_file_or_url(

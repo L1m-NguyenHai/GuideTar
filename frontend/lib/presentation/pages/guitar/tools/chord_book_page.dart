@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guidetar/data/backend_api.dart';
+import 'package:guidetar/presentation/pages/guitar/tools/artist_profile_page.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/catalog_song_chord_page.dart';
 import 'package:guidetar/presentation/state/follow_state.dart';
 
@@ -195,6 +196,16 @@ class _RecommendedSection extends StatelessWidget {
           child: FutureBuilder<List<Map<String, dynamic>>>(
             future: recommendedFuture,
             builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: 3,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) => const _RecommendedCardLoading(),
+                );
+              }
+
               final items = snapshot.data ?? const <Map<String, dynamic>>[];
               if (items.isNotEmpty) {
                 return ListView.separated(
@@ -212,19 +223,19 @@ class _RecommendedSection extends StatelessWidget {
                     final tagColor = hasYoutube ? const Color(0xFFDC2626) : const Color(0xFFF97316);
 
                     return _RecommendCard(
-                      imageUrl: imageUrl,
-                      title: title,
-                      subtitle: artist,
-                      tag: tag,
-                      tagColor: tagColor,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => CatalogSongChordPage(song: item),
-                          ),
-                        );
-                      },
-                    );
+                        imageUrl: imageUrl,
+                        title: title,
+                        subtitle: artist,
+                        tag: tag,
+                        tagColor: tagColor,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CatalogSongChordPage(song: item),
+                            ),
+                          );
+                        },
+                      );
                   },
                 );
               }
@@ -240,7 +251,7 @@ class _RecommendedSection extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF2A2A2A)),
                   ),
                   child: Text(
-                    'Chưa tải được dữ liệu bài hát từ database. Hãy kiểm tra backend rồi mở lại trang.',
+                    'Không có bài hát nào để hiển thị.',
                     style: GoogleFonts.splineSans(
                       color: const Color(0xFFD1D5DB),
                       fontSize: 13,
@@ -259,7 +270,6 @@ class _RecommendedSection extends StatelessWidget {
 
 class _RecommendCard extends StatelessWidget {
   const _RecommendCard({
-    this.imageAsset,
     this.imageUrl,
     required this.title,
     required this.subtitle,
@@ -268,7 +278,6 @@ class _RecommendCard extends StatelessWidget {
     this.onTap,
   });
 
-  final String? imageAsset;
   final String? imageUrl;
   final String title;
   final String subtitle;
@@ -300,14 +309,14 @@ class _RecommendCard extends StatelessWidget {
                             height: 144,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Image.asset(
-                              imageAsset ?? 'assets/images/chord_reco_song_gio.png',
+                              'assets/images/chord_reco_song_gio.png',
                               width: 256,
                               height: 144,
                               fit: BoxFit.cover,
                             ),
                           )
                         : Image.asset(
-                            imageAsset ?? 'assets/images/chord_reco_song_gio.png',
+                            'assets/images/chord_reco_song_gio.png',
                             width: 256,
                             height: 144,
                             fit: BoxFit.cover,
@@ -376,15 +385,39 @@ class _ArtistSection extends StatelessWidget {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: artistsFuture,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _SquareCardSection(
+            title: 'Nghệ sĩ yêu thích của bạn',
+            cards: const [
+              _SquareCardData(title: 'Đang tải...', circleImage: true, isLoading: true),
+              _SquareCardData(title: 'Đang tải...', circleImage: true, isLoading: true),
+              _SquareCardData(title: 'Đang tải...', circleImage: true, isLoading: true),
+            ],
+          );
+        }
+
         final artistItems = snapshot.data ?? const <Map<String, dynamic>>[];
         if (artistItems.isNotEmpty) {
           final cards = artistItems
               .map(
-                (item) => _SquareCardData(
-                  title: (item['artist_name'] ?? '').toString(),
-                  circleImage: true,
-                  imageUrl: (item['image_url'] ?? '').toString(),
-                ),
+                (item) {
+                  final artistName = (item['artist_name'] ?? '').toString();
+                  return _SquareCardData(
+                    title: artistName,
+                    circleImage: true,
+                    imageUrl: (item['image_url'] ?? '').toString(),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ArtistProfilePage(
+                            artistName: artistName,
+                            imageUrl: (item['image_url'] ?? '').toString(),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               )
               .toList(growable: false);
 
@@ -399,20 +432,41 @@ class _ArtistSection extends StatelessWidget {
           builder: (context, isFollowingJack, _) {
             final cards = <_SquareCardData>[
               if (isFollowingJack)
-                const _SquareCardData(
+                _SquareCardData(
                   title: 'Jack - J97',
                   circleImage: true,
                   imageAsset: 'assets/images/chord_artist_jack_followed.png',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ArtistProfilePage(artistName: 'Jack - J97'),
+                      ),
+                    );
+                  },
                 ),
-              const _SquareCardData(
+              _SquareCardData(
                 title: 'Sơn Tùng M-TP',
                 circleImage: true,
                 imageAsset: 'assets/images/chord_artist_sontung.png',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ArtistProfilePage(artistName: 'Sơn Tùng M-TP'),
+                    ),
+                  );
+                },
               ),
-              const _SquareCardData(
+              _SquareCardData(
                 title: 'Alan Walker',
                 circleImage: true,
                 imageAsset: 'assets/images/chord_artist_alanwalker.png',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ArtistProfilePage(artistName: 'Alan Walker'),
+                    ),
+                  );
+                },
               ),
             ];
 
@@ -423,6 +477,71 @@ class _ArtistSection extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _RecommendedCardLoading extends StatelessWidget {
+  const _RecommendedCardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return _LoadingPulse(
+      child: SizedBox(
+        width: 256,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                Container(
+                  width: 256,
+                  height: 144,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF262626),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    width: 56,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3A3A3A),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const Positioned.fill(
+                  child: Center(
+                    child: Icon(Icons.play_circle_fill_rounded, color: Color(0x33FFFFFF), size: 48),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: 190,
+              height: 16,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2F2F2F),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: 120,
+              height: 12,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -472,12 +591,16 @@ class _SquareCardData {
     required this.circleImage,
     this.imageAsset,
     this.imageUrl,
+    this.isLoading = false,
+    this.onTap,
   });
 
   final String? imageAsset;
   final String? imageUrl;
   final String title;
   final bool circleImage;
+  final bool isLoading;
+  final VoidCallback? onTap;
 }
 
 class _SquareCard extends StatelessWidget {
@@ -487,67 +610,144 @@ class _SquareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 160,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(data.circleImage ? 90 : 12),
-            child: SizedBox(
-              width: 160,
-              height: 160,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: (data.imageUrl != null && data.imageUrl!.isNotEmpty)
-                        ? Image.network(
-                            data.imageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Image.asset(
+    if (data.isLoading) {
+      return _LoadingPulse(
+        child: SizedBox(
+          width: 160,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF262626),
+                  borderRadius: BorderRadius.circular(data.circleImage ? 90 : 12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 104,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2F2F2F),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Center(
+                child: Container(
+                  width: 72,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A2A2A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: data.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 160,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(data.circleImage ? 90 : 12),
+              child: SizedBox(
+                width: 160,
+                height: 160,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: (data.imageUrl != null && data.imageUrl!.isNotEmpty)
+                          ? Image.network(
+                              data.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Image.asset(
+                                data.imageAsset ?? 'assets/images/profile_user_avatar.png',
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Image.asset(
                               data.imageAsset ?? 'assets/images/profile_user_avatar.png',
                               fit: BoxFit.cover,
                             ),
-                          )
-                        : Image.asset(
-                            data.imageAsset ?? 'assets/images/profile_user_avatar.png',
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                  if (!data.circleImage)
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Color(0x00000000), Color(0x99000000)],
+                    ),
+                    if (!data.circleImage)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0x00000000), Color(0x99000000)],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: 160,
-            child: Text(
-              data.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: data.circleImage ? TextAlign.center : TextAlign.left,
-              style: GoogleFonts.splineSans(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                height: 20 / 14,
+            const SizedBox(height: 8),
+            SizedBox(
+              width: 160,
+              child: Text(
+                data.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: data.circleImage ? TextAlign.center : TextAlign.left,
+                style: GoogleFonts.splineSans(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  height: 20 / 14,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _LoadingPulse extends StatefulWidget {
+  const _LoadingPulse({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_LoadingPulse> createState() => _LoadingPulseState();
+}
+
+class _LoadingPulseState extends State<_LoadingPulse> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.55, end: 1.0).animate(_controller),
+      child: widget.child,
     );
   }
 }

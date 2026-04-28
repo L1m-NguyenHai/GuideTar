@@ -91,13 +91,16 @@ class BackendApi {
     required String path,
     Map<String, dynamic>? body,
     bool requireAuth = false,
+    bool includeOptionalAuth = false,
   }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
+    final token = AuthSession.accessToken;
     if (requireAuth) {
-      final token = AuthSession.accessToken;
       if (token == null || token.isEmpty) {
         throw ApiException('Bạn cần đăng nhập để tiếp tục.');
       }
+      headers['Authorization'] = 'Bearer $token';
+    } else if (includeOptionalAuth && token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
 
@@ -291,6 +294,34 @@ class BackendApi {
         .toList(growable: false);
   }
 
+  static Future<Map<String, dynamic>> getArtistDetail(String artistName) async {
+    final encodedName = Uri.encodeComponent(artistName.trim());
+    final response = await _request(
+      method: 'GET',
+      path: '/artists/$encodedName',
+      includeOptionalAuth: true,
+    );
+    return _decodeMap(response);
+  }
+
+  static Future<void> followArtist(String artistName) async {
+    final encodedName = Uri.encodeComponent(artistName.trim());
+    await _request(
+      method: 'POST',
+      path: '/artists/$encodedName/follow',
+      requireAuth: true,
+    );
+  }
+
+  static Future<void> unfollowArtist(String artistName) async {
+    final encodedName = Uri.encodeComponent(artistName.trim());
+    await _request(
+      method: 'DELETE',
+      path: '/artists/$encodedName/follow',
+      requireAuth: true,
+    );
+  }
+
   static Future<Map<String, dynamic>> getWeeklyAnalytics() async {
     final response = await _request(
       method: 'GET',
@@ -388,6 +419,18 @@ class BackendApi {
       body: <String, dynamic>{},
     );
     return _decodeMap(response);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAnalyzeHistory() async {
+    final response = await _request(
+      method: 'GET',
+      path: '/api/analyze/history',
+      requireAuth: true,
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
   }
 
   static Future<Map<String, dynamic>> pay({

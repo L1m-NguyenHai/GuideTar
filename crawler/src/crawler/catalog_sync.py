@@ -105,6 +105,7 @@ async def sync_public_catalog_from_csv(songs_csv_path: str, artists_csv_path: st
                     youtube_url = (row.get("youtube_url") or "").strip()
                     key_original = (row.get("key_original") or "").strip()
                     rhythm_name = (row.get("rhythm_name") or "").strip()
+                    note = (row.get("lyric_note_text") or row.get("note") or "").strip()
                     chord_set = (row.get("chord_set") or "").strip()
                     lyrics = (row.get("lyrics") or "").strip()
 
@@ -119,6 +120,7 @@ async def sync_public_catalog_from_csv(songs_csv_path: str, artists_csv_path: st
                             youtube_url,
                             key_original,
                             rhythm_name,
+                            note,
                             chord_set,
                             lyrics,
                             duration_seconds,
@@ -134,6 +136,7 @@ async def sync_public_catalog_from_csv(songs_csv_path: str, artists_csv_path: st
                             nullif($8, ''),
                             nullif($9, ''),
                             nullif($10, ''),
+                            nullif($11, ''),
                             null,
                             now()
                         )
@@ -146,6 +149,7 @@ async def sync_public_catalog_from_csv(songs_csv_path: str, artists_csv_path: st
                             youtube_url = excluded.youtube_url,
                             key_original = excluded.key_original,
                             rhythm_name = excluded.rhythm_name,
+                            note = excluded.note,
                             chord_set = excluded.chord_set,
                             lyrics = excluded.lyrics
                         """,
@@ -157,6 +161,7 @@ async def sync_public_catalog_from_csv(songs_csv_path: str, artists_csv_path: st
                         youtube_url,
                         key_original,
                         rhythm_name,
+                        note,
                         chord_set,
                         lyrics,
                     )
@@ -175,6 +180,7 @@ async def _ensure_catalog_schema(conn: asyncpg.Connection) -> None:
             add column if not exists source_url text,
             add column if not exists key_original text,
             add column if not exists rhythm_name text,
+            add column if not exists note text,
             add column if not exists chord_set text,
             add column if not exists lyrics text
         """

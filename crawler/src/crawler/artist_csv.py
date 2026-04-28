@@ -6,10 +6,12 @@ import re
 import unicodedata
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import httpx
-from yt_dlp import YoutubeDL
+
+if TYPE_CHECKING:
+    from yt_dlp import YoutubeDL
 
 
 logger = logging.getLogger(__name__)
@@ -131,6 +133,8 @@ def _score_video_for_artist(entry: dict[str, Any], artist_name: str) -> int:
 
 
 def _lookup_youtube_channel_image(artist_name: str) -> str:
+    from yt_dlp import YoutubeDL
+
     ydl_opts: dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
