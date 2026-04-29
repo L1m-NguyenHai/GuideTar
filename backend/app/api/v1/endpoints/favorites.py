@@ -99,3 +99,18 @@ async def remove_favorite_lesson(
         lesson_id,
     )
     return {"detail": "Lesson removed from favorites"}
+
+
+@router.get("/recent-lessons")
+async def get_recent_lessons(current_user: UserMeResponse = Depends(get_current_user)) -> list[dict[str, Any]]:
+    rows = await fetch(
+        """
+        select l.id, l.title, l.description, l.level, l.thumbnail_url, rl.created_at, rl.last_activated
+        from user_recent_lessons rl
+        join lessons l on l.id = rl.lesson_id
+        where rl.user_id = $1
+        order by rl.last_activated desc
+        """,
+        current_user.id,
+    )
+    return [dict(row) for row in rows]

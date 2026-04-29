@@ -321,6 +321,18 @@ class BackendApi {
         .toList(growable: false);
   }
 
+  static Future<List<Map<String, dynamic>>> getRecentLessons() async {
+    final response = await _request(
+      method: 'GET',
+      path: '/favorites/recent-lessons',
+      requireAuth: true,
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
   static Future<List<Map<String, dynamic>>> getCatalogRecommendedSongs({
     int limit = 10,
   }) async {
