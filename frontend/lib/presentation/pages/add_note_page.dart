@@ -4,15 +4,24 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:gap/gap.dart';
 
 class AddNotePage extends StatefulWidget {
-  const AddNotePage({Key? key}) : super(key: key);
+  const AddNotePage({
+    Key? key,
+    this.initialTitle,
+    this.initialContent,
+    this.initialCategory,
+  }) : super(key: key);
+
+  final String? initialTitle;
+  final String? initialContent;
+  final String? initialCategory;
 
   @override
   State<AddNotePage> createState() => _AddNotePageState();
 }
 
 class _AddNotePageState extends State<AddNotePage> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _contentController = TextEditingController();
+  late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
   int _selectedCategoryIndex = 0;
 
   final List<String> categories = [
@@ -21,6 +30,23 @@ class _AddNotePageState extends State<AddNotePage> {
     'Nguồn cảm hứng',
     'Lý thuyết',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialTitle ?? '');
+    _contentController = TextEditingController(text: widget.initialContent ?? '');
+    
+    // Set selected category based on initialCategory
+    if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+      final index = categories.indexWhere(
+        (cat) => cat.toLowerCase() == widget.initialCategory!.toLowerCase(),
+      );
+      if (index >= 0) {
+        _selectedCategoryIndex = index;
+      }
+    }
+  }
 
   @override
   void dispose() {
