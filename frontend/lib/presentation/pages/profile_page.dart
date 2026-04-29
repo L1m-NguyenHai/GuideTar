@@ -964,8 +964,49 @@ class _RecentCourseCard extends StatelessWidget {
   }
 }
 
-class _PersonalNotesSection extends StatelessWidget {
+class _PersonalNotesSection extends StatefulWidget {
   const _PersonalNotesSection();
+
+  @override
+  State<_PersonalNotesSection> createState() => _PersonalNotesSectionState();
+}
+
+class _PersonalNotesSectionState extends State<_PersonalNotesSection> {
+  late Future<List<Map<String, dynamic>>> _userNotesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _userNotesFuture = BackendApi.getUserNotes();
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final day = date.day.toString().padLeft(2, '0');
+      final month = date.month.toString().padLeft(2, '0');
+      final year = date.year;
+      return '$day THÁNG $month';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Color _getColorForType(String? noteType) {
+    if (noteType == null || noteType.isEmpty) {
+      return const Color.fromRGBO(255, 183, 134, 0.4);
+    }
+    switch (noteType.toLowerCase()) {
+      case 'practice':
+      case 'luyện tập':
+        return const Color.fromRGBO(255, 183, 134, 0.4);
+      case 'inspiration':
+      case 'nguồn cảm hứng':
+        return const Color.fromRGBO(146, 204, 255, 0.4);
+      default:
+        return const Color.fromRGBO(255, 183, 134, 0.4);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1024,18 +1065,89 @@ class _PersonalNotesSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const _NoteCard(
-          title: '24 THÁNG 10 • LUYỆN TẬP',
-          body:
-              'Tập trung vào sức mạnh của ngón út cho chuyển động Fmaj7. Giữ ngón cái thấp trên cần đàn.',
-          borderColor: Color.fromRGBO(255, 183, 134, 0.4),
-        ),
-        const SizedBox(height: 12),
-        const _NoteCard(
-          title: '23 THÁNG 10 • NGUỒN CẢM HỨNG',
-          body:
-              "Hãy tham khảo cách Miles Davis chơi solo trong 'So What' để có trải nghiệm ứng tấu giai điệu tốt hơn.",
-          borderColor: Color.fromRGBO(146, 204, 255, 0.4),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _userNotesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFFF97F08),
+                    ),
+                    strokeWidth: 2,
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Không thể tải ghi chú',
+                  style: GoogleFonts.manrope(
+                    color: const Color(0xFFDEC1AF),
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+
+            final notes = snapshot.data ?? [];
+            if (notes.isEmpty) {
+              return Center(
+                child: Text(
+                  'Chưa có ghi chú',
+                  style: GoogleFonts.manrope(
+                    color: const Color(0xFFDEC1AF),
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }
+
+            final displayCount = notes.length > 2 ? 2 : notes.length;
+            return Column(
+              children: List.generate(
+                displayCount,
+                (index) {
+                  final note = notes[index];
+                  final dateStr = _formatDate((note['date'] ?? '').toString());
+                  final typeStr = (note['type'] ?? '').toString().toUpperCase();
+                  final title = dateStr.isNotEmpty && typeStr.isNotEmpty
+                      ? '$dateStr • $typeStr'
+                      : dateStr.isNotEmpty
+                          ? dateStr
+                          : typeStr;
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index < displayCount - 1 ? 12 : 0,
+                    ),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => AddNotePage(
+                              initialTitle: (note['title'] ?? '').toString(),
+                              initialContent: (note['content'] ?? '').toString(),
+                              initialCategory: (note['type'] ?? '').toString(),
+                            ),
+                          ),
+                        );
+                      },
+                      child: _NoteCard(
+                        title: title.isEmpty ? 'Ghi chú' : title,
+                        body: (note['title'] ?? '').toString(),
+                        borderColor: _getColorForType((note['type'] ?? '').toString()),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
         const SizedBox(height: 16),
         Center(
