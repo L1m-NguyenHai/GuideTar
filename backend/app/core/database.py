@@ -31,7 +31,7 @@ async def init_db_pool() -> None:
                 dsn=database_url,
                 min_size=3,
                 max_size=15,
-                statement_cache_size=300,
+                statement_cache_size=0,
             ),
             timeout=5,
         )
