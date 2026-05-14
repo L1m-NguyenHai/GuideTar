@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import collections
 import collections.abc
 import json
@@ -596,6 +597,23 @@ async def save_analysis_history(
     )
 
 
+def _run_analysis_pipeline(
+    audio_path: Path,
+    model_repo: Path,
+    lab_path: Path,
+    chord_dict: str,
+) -> tuple[list[float], float, str, list[dict[str, float | str]], str]:
+    beats, bpm = detect_beats_madmom(audio_path)
+    logs = run_chord_cnn_lstm(model_repo, audio_path, lab_path, chord_dict)
+    chords = parse_lab_file(lab_path)
+    lab_text = lab_path.read_text(encoding="utf-8")
+    return beats, bpm, logs, chords, lab_text
+
+
+def _download_youtube(youtube_url: str, tmp_dir: Path) -> tuple[Path, str]:
+    return download_audio_from_youtube(youtube_url, tmp_dir)
+
+
 async def analyze_audio_file_or_url(
     request: Request,
     file: UploadFile | None,
@@ -610,6 +628,8 @@ async def analyze_audio_file_or_url(
     if file and file.content_type not in {"audio/mpeg", "audio/mp3", "application/octet-stream"}:
         raise HTTPException(status_code=400, detail="Only MP3 upload is supported.")
 
+    loop = asyncio.get_running_loop()
+
     with tempfile.TemporaryDirectory(prefix="guidetar_api_") as tmpdir:
         tmp_dir = Path(tmpdir)
         filename_for_response = file.filename if file else "youtube_audio.mp3"
@@ -620,17 +640,18 @@ async def analyze_audio_file_or_url(
             audio_path.write_bytes(await file.read())
         elif youtube_url:
             try:
-                downloaded_path, video_title = download_audio_from_youtube(youtube_url, tmp_dir)
+                downloaded_path, video_title = await loop.run_in_executor(
+                    None, _download_youtube, youtube_url, tmp_dir,
+                )
                 shutil.copy2(downloaded_path, audio_path)
                 filename_for_response = f"{video_title}.mp3"
             except Exception as exc:
                 raise HTTPException(status_code=400, detail=f"YouTube download failed: {exc}") from exc
 
         try:
-            beats, bpm = detect_beats_madmom(audio_path)
-            logs = run_chord_cnn_lstm(Path(model_repo).resolve(), audio_path, lab_path, chord_dict)
-            chords = parse_lab_file(lab_path)
-            lab_text = lab_path.read_text(encoding="utf-8")
+            beats, bpm, logs, chords, lab_text = await loop.run_in_executor(
+                None, _run_analysis_pipeline, audio_path, Path(model_repo).resolve(), lab_path, chord_dict,
+            )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except Exception as exc:
