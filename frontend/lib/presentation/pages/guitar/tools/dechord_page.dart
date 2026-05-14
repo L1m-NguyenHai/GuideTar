@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:guidetar/data/auth_session.dart';
 import 'package:guidetar/data/backend_api.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/dechord_result_page.dart';
+import 'package:guidetar/presentation/pages/membership_register_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
 class DeChordPage extends StatefulWidget {
@@ -48,6 +49,8 @@ class _DeChordPageState extends State<DeChordPage> {
   String? _recentError;
   List<Map<String, dynamic>> _recentAnalyses = const [];
   bool _deferRecentLoadUntilAnalyzeDone = false;
+  Map<String, dynamic>? _limitStatus;
+  bool _isLoadingLimit = true;
 
   @override
   void initState() {
@@ -56,7 +59,29 @@ class _DeChordPageState extends State<DeChordPage> {
       _deferRecentLoadUntilAnalyzeDone = true;
       _startProcessingTicker();
     } else {
-      _loadRecentAnalyses();
+      _loadInitialData();
+    }
+  }
+
+  Future<void> _loadInitialData() async {
+    await Future.wait([
+      _loadLimitStatus(),
+      _loadRecentAnalyses(),
+    ]);
+  }
+
+  Future<void> _loadLimitStatus() async {
+    setState(() => _isLoadingLimit = true);
+    try {
+      final status = await BackendApi.getAnalyzeLimitStatus();
+      if (!mounted) return;
+      setState(() {
+        _limitStatus = status;
+        _isLoadingLimit = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingLimit = false);
     }
   }
 
@@ -244,7 +269,7 @@ class _DeChordPageState extends State<DeChordPage> {
       );
 
       if (mounted) {
-        unawaited(_loadRecentAnalyses(silent: true));
+        unawaited(_loadInitialData());
       }
     } on TimeoutException {
       if (mounted) {
@@ -274,7 +299,7 @@ class _DeChordPageState extends State<DeChordPage> {
       }
       if (_deferRecentLoadUntilAnalyzeDone) {
         _deferRecentLoadUntilAnalyzeDone = false;
-        unawaited(_loadRecentAnalyses(silent: true));
+        unawaited(_loadInitialData());
       }
     }
   }
@@ -565,12 +590,22 @@ class _DeChordPageState extends State<DeChordPage> {
                     selectedFileName: _selectedFileName,
                     onPickLocalSong: _pickLocalSong,
                     onAnalyze: _analyzeSelectedSong,
+                    isLimitReached: _limitStatus != null && 
+                                   _limitStatus!['limit'] != -1 && 
+                                   _limitStatus!['remaining'] <= 0,
                   ),
                   const SizedBox(height: 16),
                   _LinkImportCard(
                     controller: _youtubeUrlController,
                     onAnalyze: _analyzeYoutubeUrl,
+                    isLimitReached: _limitStatus != null && 
+                                   _limitStatus!['limit'] != -1 && 
+                                   _limitStatus!['remaining'] <= 0,
                   ),
+                  if (_limitStatus != null && !_isProcessing) ...[
+                    const SizedBox(height: 16),
+                    _LimitInfoCard(status: _limitStatus!),
+                  ],
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),
                     _InlineErrorCard(message: _errorMessage!),
@@ -761,11 +796,13 @@ class _UploadCard extends StatelessWidget {
     required this.selectedFileName,
     required this.onPickLocalSong,
     required this.onAnalyze,
+    required this.isLimitReached,
   });
 
   final String? selectedFileName;
   final VoidCallback onPickLocalSong;
   final VoidCallback onAnalyze;
+  final bool isLimitReached;
 
   @override
   Widget build(BuildContext context) {
@@ -864,20 +901,20 @@ class _UploadCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: GestureDetector(
-                  onTap: onAnalyze,
+                  onTap: isLimitReached ? null : onAnalyze,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF923E), Color(0xFFF97F06)],
-                      ),
+                      gradient: isLimitReached
+                        ? const LinearGradient(colors: [Color(0xFF333333), Color(0xFF262626)])
+                        : const LinearGradient(colors: [Color(0xFFFF923E), Color(0xFFF97F06)]),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Center(
                       child: Text(
-                        'Phân tích ngay',
+                        isLimitReached ? 'Hết lượt' : 'Phân tích ngay',
                         style: GoogleFonts.plusJakartaSans(
-                          color: const Color(0xFF4D2300),
+                          color: isLimitReached ? const Color(0xFF888888) : const Color(0xFF4D2300),
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -898,10 +935,12 @@ class _LinkImportCard extends StatelessWidget {
   const _LinkImportCard({
     required this.controller,
     required this.onAnalyze,
+    required this.isLimitReached,
   });
 
   final TextEditingController controller;
   final VoidCallback onAnalyze;
+  final bool isLimitReached;
 
   @override
   Widget build(BuildContext context) {
@@ -955,21 +994,21 @@ class _LinkImportCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: onAnalyze,
+            onTap: isLimitReached ? null : onAnalyze,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF923E), Color(0xFFF97F06)],
-                ),
+                gradient: isLimitReached
+                  ? const LinearGradient(colors: [Color(0xFF333333), Color(0xFF262626)])
+                  : const LinearGradient(colors: [Color(0xFFFF923E), Color(0xFFF97F06)]),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Center(
                 child: Text(
-                  'Analyze Link YouTube',
+                  isLimitReached ? 'Hết lượt phân tích' : 'Analyze Link YouTube',
                   style: GoogleFonts.plusJakartaSans(
-                    color: const Color(0xFF4D2300),
+                    color: isLimitReached ? const Color(0xFF888888) : const Color(0xFF4D2300),
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1004,8 +1043,97 @@ class _LinkImportCard extends StatelessWidget {
   }
 }
 
+class _LimitInfoCard extends StatelessWidget {
+  const _LimitInfoCard({required this.status});
+  final Map<String, dynamic> status;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMaestro = status['plan'] == 'MAESTRO';
+    final int used = status['used'] ?? 0;
+    final int limit = status['limit'] ?? 0;
+    final int remaining = status['remaining'] ?? 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1B1F),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isMaestro ? const Color(0xFFFFB77D).withOpacity(0.3) : const Color(0xFF33353B)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isMaestro ? const Color(0xFFFFB77D).withOpacity(0.1) : const Color(0xFF26282E),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isMaestro ? Icons.auto_awesome : Icons.info_outline,
+              color: isMaestro ? const Color(0xFFFFB77D) : const Color(0xFF8E8C88),
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isMaestro ? 'Gói MAESTRO: Phân tích vô hạn' : 'Giới hạn tuần này: $used/$limit lượt',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (!isMaestro) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    remaining > 0 
+                      ? 'Bạn còn $remaining lượt dùng AI DeChord tuần này.' 
+                      : 'Bạn đã hết lượt tuần này. Nâng cấp để không giới hạn!',
+                    style: GoogleFonts.manrope(
+                      color: const Color(0xFFADAAAA),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (!isMaestro && remaining <= 0)
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MembershipRegisterPage()),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB77D),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'NÂNG CẤP',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: const Color(0xFF1F1F1F),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 class _InlineErrorCard extends StatelessWidget {
-  const _InlineErrorCard({required this.message});
+  const _InlineErrorCard({super.key, required this.message});
 
   final String message;
 

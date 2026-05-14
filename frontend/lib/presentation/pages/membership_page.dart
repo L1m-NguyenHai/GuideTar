@@ -293,9 +293,11 @@ class _MembershipPageState extends State<MembershipPage> {
                         child: Text(
                           _isLoading
                               ? 'ĐANG TẢI...'
-                              : (_subscription == null
-                                    ? 'CHƯA CÓ\nGÓI'
-                                    : 'ĐĂNG KÝ\n${((_subscription?['status'] ?? '').toString()).toUpperCase()}'),
+                              : (_subscription == null || _subscription?['status'] != 'active'
+                                    ? 'SOLO'
+                                    : (_subscription?['plan_name'] ?? 'SOLO')
+                                          .toString()
+                                          .toUpperCase()),
                           style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
                             fontSize: 31,
@@ -317,12 +319,16 @@ class _MembershipPageState extends State<MembershipPage> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          (_subscription?['plan_name'] ?? 'MEMBER')
+                          (_subscription != null &&
+                                      _subscription?['status'] == 'active' &&
+                                      _subscription?['plan_code'] == 'MAESTRO'
+                                  ? 'ĐANG HOẠT ĐỘNG'
+                                  : 'MIỄN PHÍ')
                               .toString()
                               .toUpperCase(),
                           style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -331,13 +337,17 @@ class _MembershipPageState extends State<MembershipPage> {
                   ),
                   const SizedBox(height: 16),
                   _NextPaymentCard(
-                    nextPaymentDate: _formatDate(_subscription?['renew_at']),
+                    nextPaymentDate: _subscription?['plan_code'] == 'MAESTRO' 
+                        ? _formatDate(_subscription?['renew_at'])
+                        : 'VÔ THỜI HẠN',
                     onChangeTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const MembershipRegisterPage(),
-                        ),
-                      );
+                      Navigator.of(context)
+                          .push(
+                            MaterialPageRoute(
+                              builder: (_) => const MembershipRegisterPage(),
+                            ),
+                          )
+                          .then((_) => _loadBilling());
                     },
                   ),
                   const SizedBox(height: 18),
@@ -357,21 +367,25 @@ class _MembershipPageState extends State<MembershipPage> {
                   const SizedBox(height: 12),
                   _BenefitCard(
                     title: 'Trạng thái gói',
-                    status: (_subscription?['status'] ?? 'inactive')
+                    status: (_subscription == null || _subscription?['status'] == 'active' ? 'ĐANG HOẠT ĐỘNG' : 'CHƯA KÍCH HOẠT')
                         .toString()
                         .toUpperCase(),
                     icon: Icons.analytics_outlined,
                   ),
                   const SizedBox(height: 12),
-                  const _BenefitCard(
-                    title: 'Thư  viện  bài  hát  cao  cấp',
-                    status: 'HOẠT ĐỘNG',
+                  _BenefitCard(
+                    title: 'Thư viện bài hát cao cấp',
+                    status: (_subscription == null || _subscription?['status'] == 'active' || _subscription?['plan_code'] == 'SOLO')
+                        ? 'HOẠT ĐỘNG'
+                        : 'CHƯA KÍCH HOẠT',
                     icon: Icons.library_music_outlined,
                   ),
                   const SizedBox(height: 12),
-                  const _BenefitCard(
-                    title: 'Chế  độ  luyện  tập  thông  minh',
-                    status: 'HOẠT ĐỘNG',
+                  _BenefitCard(
+                    title: 'Chế độ luyện tập thông minh',
+                    status: (_subscription == null || _subscription?['status'] == 'active' || _subscription?['plan_code'] == 'SOLO')
+                        ? 'HOẠT ĐỘNG'
+                        : 'CHƯA KÍCH HOẠT',
                     icon: Icons.auto_awesome_outlined,
                   ),
                   const SizedBox(height: 20),
@@ -439,31 +453,32 @@ class _MembershipPageState extends State<MembershipPage> {
                         const SizedBox(height: 10),
                     ],
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _showCancelDialog,
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: Color.fromRGBO(255, 255, 255, 0.12),
+                  if (_subscription != null && _subscription?['plan_code'] == 'MAESTRO' && _subscription?['status'] == 'active')
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _showCancelDialog,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                            color: Color.fromRGBO(255, 255, 255, 0.12),
+                          ),
+                          backgroundColor: const Color(0xFF201F1F),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        backgroundColor: const Color(0xFF201F1F),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(
-                        'HUỶ ĐĂNG KÝ',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: const Color(0xFFFFB08C),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
+                        child: Text(
+                          'HUỶ ĐĂNG KÝ',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: const Color(0xFFFFB08C),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
