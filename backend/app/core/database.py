@@ -29,9 +29,9 @@ async def init_db_pool() -> None:
         _pool = await asyncio.wait_for(
             asyncpg.create_pool(
                 dsn=database_url,
-                min_size=1,
-                max_size=10,
-                statement_cache_size=0,
+                min_size=3,
+                max_size=15,
+                statement_cache_size=300,
             ),
             timeout=5,
         )

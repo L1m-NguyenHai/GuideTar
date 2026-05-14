@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from fastapi import Header, HTTPException
@@ -7,6 +8,9 @@ from fastapi import Header, HTTPException
 from app.core.database import fetchrow
 from app.core.security import decode_token
 from app.schemas.user import UserMeResponse
+
+_USER_CACHE: dict[str, tuple[float, UserMeResponse]] = {}
+_CACHE_TTL = 300
 
 
 def _map_user_row(row: Any) -> UserMeResponse:
@@ -23,6 +27,10 @@ def _map_user_row(row: Any) -> UserMeResponse:
 
 
 async def get_user_by_id(user_id: str) -> UserMeResponse:
+    cached = _USER_CACHE.get(user_id)
+    if cached and time.monotonic() - cached[0] < _CACHE_TTL:
+        return cached[1]
+
     row = await fetchrow(
         """
         select u.id, u.email, u.username, p.display_name, p.avatar_url, p.bio, p.rank_label
@@ -34,7 +42,10 @@ async def get_user_by_id(user_id: str) -> UserMeResponse:
     )
     if row is None:
         raise HTTPException(status_code=401, detail="User not found")
-    return _map_user_row(row)
+
+    user = _map_user_row(row)
+    _USER_CACHE[user_id] = (time.monotonic(), user)
+    return user
 
 
 async def get_current_user(authorization: str | None = Header(default=None)) -> UserMeResponse:
