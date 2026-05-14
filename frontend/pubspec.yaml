@@ -44,6 +44,7 @@ dependencies:
   youtube_player_flutter: ^9.1.1
   just_audio: ^0.9.39
   shared_preferences: ^2.5.3
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:

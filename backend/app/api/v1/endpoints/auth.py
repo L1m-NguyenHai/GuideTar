@@ -52,6 +52,16 @@ async def register(payload: RegisterRequest) -> TokenPairResponse:
         payload.username,
     )
 
+    # Automatically assign SOLO plan to new users
+    await execute(
+        """
+        insert into user_subscriptions (user_id, plan_id, status)
+        values ($1, (select id from subscription_plans where code = 'SOLO' limit 1), 'active')
+        on conflict (user_id, plan_id) do nothing
+        """,
+        user_row["id"],
+    )
+
     user = await get_user_by_id(str(user_row["id"]))
     return _build_token_response(user)
 

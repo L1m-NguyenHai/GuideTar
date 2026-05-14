@@ -3,7 +3,19 @@ def main() -> None:
     import uvicorn
 
     reload_flag = os.getenv("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    workers_str = os.getenv("UVICORN_WORKERS", "").strip()
+
+    kwargs: dict[str, object] = {
+        "host": os.getenv("UVICORN_HOST", "127.0.0.1"),
+        "port": int(os.getenv("UVICORN_PORT", "8000")),
+    }
+
+    if reload_flag:
+        kwargs["reload"] = True
+    else:
+        kwargs["workers"] = int(workers_str) if workers_str.isdigit() else 1
+
+    uvicorn.run("app.main:app", **kwargs)
 
 
 if __name__ == "__main__":

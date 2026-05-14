@@ -1,0 +1,11 @@
+[project]
+name = "chord-model"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "librosa>=0.7.2",
+    "numpy>=1.19.2",
+    "torch>=1.4.0",
+    "pydub>=0.23.1",
+    "joblib>=0.13.2",
+]
