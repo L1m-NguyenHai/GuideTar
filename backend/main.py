@@ -13,7 +13,7 @@ def main() -> None:
     if reload_flag:
         kwargs["reload"] = True
     else:
-        kwargs["workers"] = int(workers_str) if workers_str.isdigit() else 4
+        kwargs["workers"] = int(workers_str) if workers_str.isdigit() else 1
 
     uvicorn.run("app.main:app", **kwargs)
 

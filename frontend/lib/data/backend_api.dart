@@ -510,6 +510,15 @@ class BackendApi {
         .toList(growable: false);
   }
 
+  static Future<Map<String, dynamic>> getAnalyzeLimitStatus() async {
+    final response = await _request(
+      method: 'GET',
+      path: '/api/analyze/limit',
+      requireAuth: true,
+    );
+    return _decodeMap(response);
+  }
+
   static Future<Map<String, dynamic>> getAnalyzeHistoryDetail(String analysisId) async {
     final response = await _request(
       method: 'GET',
@@ -524,18 +533,23 @@ class BackendApi {
     required String currency,
     required String methodType,
     String? subscriptionId,
+    String? planId,
+    String? billingCycle,
   }) async {
     final response = await _request(
       method: 'POST',
-      path: '/billing/pay',
+      path: '/billing/pay/vnpay',
       requireAuth: true,
       body: <String, dynamic>{
         'amount': amount,
         'currency': currency,
         'method_type': methodType,
-        'subscription_id': subscriptionId,
+        if (subscriptionId != null) 'subscription_id': subscriptionId,
+        if (planId != null) 'plan_id': planId,
+        if (billingCycle != null) 'billing_cycle': billingCycle,
       },
     );
+
     return _decodeMap(response);
   }
 }

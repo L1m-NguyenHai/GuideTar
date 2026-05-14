@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:guidetar/presentation/pages/membership_payment_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
+import 'package:guidetar/data/backend_api.dart';
 
 enum _PlanType { solo, maestro }
 
@@ -21,8 +22,40 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
 
   int _selectedNavIndex = 2;
   bool _isYearly = false;
-  _PlanType _focusedPlan = _PlanType.maestro;
-  _PlanType _currentPlan = _PlanType.maestro;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _plans = [];
+  Map<String, dynamic>? _subscription;
+  int _focusedIndex = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final results = await Future.wait<dynamic>([
+        BackendApi.getBillingPlans(),
+        BackendApi.getBillingSubscription(),
+      ]);
+      setState(() {
+        _plans = results[0] as List<Map<String, dynamic>>;
+        _subscription = results[1] as Map<String, dynamic>?;
+        _isLoading = false;
+      });
+      // Debug log to check subscription data
+      debugPrint('Current Subscription: $_subscription');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tải dữ liệu gói: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -39,7 +72,11 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
     });
   }
 
-  Future<void> _showMaestroPopupAndContinue() async {
+  Future<void> _showMaestroPopupAndContinue(Map<String, dynamic> plan) async {
+    final double amount = _isYearly
+        ? double.parse(plan['price_yearly'].toString())
+        : double.parse(plan['price_monthly'].toString());
+
     final approved = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -65,7 +102,7 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'MAESTRO',
+                      plan['code'].toString().toUpperCase(),
                       style: GoogleFonts.plusJakartaSans(
                         color: Colors.white,
                         fontSize: 60 * 0.5,
@@ -116,7 +153,7 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
                           elevation: 0,
                         ),
                         child: Text(
-                          'DÙNG THỬ 2 TUẦN',
+                          'ĐĂNG KÝ NGAY',
                           maxLines: 1,
                           overflow: TextOverflow.visible,
                           softWrap: false,
@@ -129,7 +166,7 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Sau đó 63.000 VNĐ/tháng. Huỷ bất cứ lúc nào.',
+                      'Thanh toán ${amount.toInt()} VNĐ/${_isYearly ? "năm" : "tháng"}. Huỷ bất cứ lúc nào.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
                         color: const Color(0xFF8E8C88),
@@ -158,33 +195,48 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
     }
 
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MembershipPaymentPage()),
+      MaterialPageRoute(
+        builder: (_) => MembershipPaymentPage(
+          plan: plan,
+          isYearly: _isYearly,
+        ),
+      ),
     );
   }
 
-  void _onSubscribe(_PlanType plan) {
-    if (_currentPlan == plan) {
+  void _onSubscribe(Map<String, dynamic> plan) {
+    if (_subscription != null &&
+        _subscription!['plan_id'] == plan['id'] &&
+        _subscription!['status'] == 'active') {
       return;
     }
 
-    if (plan == _PlanType.maestro) {
-      _showMaestroPopupAndContinue();
+    // Disable Solo if Maestro is active
+    if (plan['code'] == 'SOLO' &&
+        _subscription != null &&
+        _subscription!['status'] == 'active' &&
+        _subscription!['plan_code'] == 'MAESTRO') {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Bạn đang dùng gói MAESTRO, không thể chọn SOLO cho tới khi hết hạn.'),
+          ),
+        );
       return;
     }
 
-    setState(() {
-      _currentPlan = plan;
-    });
+    if (plan['code'] == 'MAESTRO') {
+      _showMaestroPopupAndContinue(plan);
+      return;
+    }
 
+    // For Solo/Free plan
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(
-            plan == _PlanType.maestro
-                ? 'Bạn đã đăng ký gói MAESTRO.'
-                : 'Bạn đã chuyển về gói SOLO.',
-          ),
+        const SnackBar(
+          content: Text('Bạn đang sử dụng gói SOLO (Miễn phí).'),
         ),
       );
   }
@@ -223,38 +275,51 @@ class _MembershipRegisterPageState extends State<MembershipRegisterPage> {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 104),
-                    child: PageView(
-                      clipBehavior: Clip.none,
-                      controller: _pageController,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _focusedPlan = index == 0
-                              ? _PlanType.solo
-                              : _PlanType.maestro;
-                        });
-                      },
-                      children: [
-                        _PlanCard(
-                          isMaestro: false,
-                          isYearly: _isYearly,
-                          isFocused: _focusedPlan == _PlanType.solo,
-                          isCurrent: _currentPlan == _PlanType.solo,
-                          onActionTap: () => _onSubscribe(_PlanType.solo),
-                        ),
-                        _PlanCard(
-                          isMaestro: true,
-                          isYearly: _isYearly,
-                          isFocused: _focusedPlan == _PlanType.maestro,
-                          isCurrent: _currentPlan == _PlanType.maestro,
-                          onActionTap: () => _onSubscribe(_PlanType.maestro),
-                        ),
-                      ],
-                    ),
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : PageView.builder(
+                            clipBehavior: Clip.none,
+                            controller: _pageController,
+                            itemCount: _plans.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _focusedIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              final plan = _plans[index];
+                              final isMaestro = plan['code'] == 'MAESTRO';
+                              
+                              // Logic: SOLO is current if (user has SOLO active) OR (user has NO active subscription)
+                              final bool hasActiveSub = _subscription != null && _subscription!['status'] == 'active';
+                              final bool isUserOnMaestro = hasActiveSub && _subscription!['plan_code'].toString().toUpperCase().trim() == 'MAESTRO';
+                              
+                              final isCurrent = isUserOnMaestro 
+                                  ? (plan['code'].toString().toUpperCase().trim() == 'MAESTRO')
+                                  : (plan['code'].toString().toUpperCase().trim() == 'SOLO');
+                              
+                              debugPrint('Plan: ${plan['code']} | isUserOnMaestro: $isUserOnMaestro | isCurrent: $isCurrent');
+
+                              // Logic: if current is Maestro, Solo is disabled
+                              final isDisabled = isUserOnMaestro && plan['code'].toString().toUpperCase().trim() == 'SOLO';
+
+                              return _PlanCard(
+                                isMaestro: isMaestro,
+                                isYearly: _isYearly,
+                                isFocused: _focusedIndex == index,
+                                isCurrent: isCurrent,
+                                isDisabled: isDisabled,
+                                plan: plan,
+                                onActionTap: () => _onSubscribe(plan),
+                              );
+                            },
+                          ),
                   ),
                 ),
               ],
             ),
           ),
+
           SafeArea(
             bottom: false,
             child: _TopBar(onBackTap: () => Navigator.of(context).maybePop()),
@@ -505,6 +570,8 @@ class _PlanCard extends StatelessWidget {
     required this.isYearly,
     required this.isFocused,
     required this.isCurrent,
+    required this.isDisabled,
+    required this.plan,
     required this.onActionTap,
   });
 
@@ -512,7 +579,10 @@ class _PlanCard extends StatelessWidget {
   final bool isYearly;
   final bool isFocused;
   final bool isCurrent;
+  final bool isDisabled;
+  final Map<String, dynamic> plan;
   final VoidCallback onActionTap;
+
 
   @override
   Widget build(BuildContext context) {
@@ -584,9 +654,12 @@ class _PlanCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     isMaestro
-                        ? (isYearly ? '50.000 VNĐ' : '63.000 VNĐ')
+                        ? (isYearly
+                            ? '${double.parse(plan['price_yearly'].toString()).toInt()} VNĐ'
+                            : '${double.parse(plan['price_monthly'].toString()).toInt()} VNĐ')
                         : '0 VNĐ',
                     style: GoogleFonts.plusJakartaSans(
+
                       color: Colors.white,
                       fontSize: 58 * 0.5,
                       fontWeight: FontWeight.w800,
@@ -660,24 +733,24 @@ class _PlanCard extends StatelessWidget {
                         width: 161,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: isCurrent
+                          color: (isCurrent || isDisabled)
                               ? const Color(0xFF363636)
                               : const Color(0xFFF97F06),
                           borderRadius: BorderRadius.circular(99),
                           border: Border.all(
-                            color: isCurrent
+                            color: (isCurrent || isDisabled)
                                 ? const Color(0xFF5D5E62)
                                 : const Color(0xFFF97F06),
                           ),
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          isCurrent ? 'HIỆN TẠI' : 'ĐĂNG KÝ',
+                          isCurrent ? 'HIỆN TẠI' : (isDisabled ? 'KHÔNG KHẢ DỤNG' : 'ĐĂNG KÝ'),
                           style: GoogleFonts.plusJakartaSans(
-                            color: isCurrent
+                            color: (isCurrent || isDisabled)
                                 ? const Color(0xFFE5E2E1)
                                 : const Color(0xFF2D2D2D),
-                            fontSize: 19 * 0.7,
+                            fontSize: isDisabled ? 14 * 0.7 : 19 * 0.7,
                             fontWeight: FontWeight.w700,
                           ),
                         ),

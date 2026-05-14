@@ -3,22 +3,35 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guidetar/data/backend_api.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:app_links/app_links.dart';
 
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
 enum _PaymentMethod { bank, qr }
 
 class MembershipPaymentPage extends StatefulWidget {
-  const MembershipPaymentPage({super.key});
+  const MembershipPaymentPage({
+    super.key,
+    required this.plan,
+    required this.isYearly,
+  });
+
+  final Map<String, dynamic> plan;
+  final bool isYearly;
 
   @override
   State<MembershipPaymentPage> createState() => _MembershipPaymentPageState();
 }
 
+
 class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
   int _selectedNavIndex = 2;
   _PaymentMethod _method = _PaymentMethod.bank;
   bool _isPaying = false;
+
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   final TextEditingController _cardController = TextEditingController(
     text: '4242  4242  4242',
@@ -30,8 +43,79 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
     text: '123',
   );
 
+  double _getAmount() {
+    return widget.isYearly
+        ? double.parse(widget.plan['price_yearly'].toString())
+        : double.parse(widget.plan['price_monthly'].toString());
+  }
+
+  double _getBaseAmount() {
+    // Just a placeholder for "original" price if discount exists
+    final amt = _getAmount();
+    return widget.isYearly ? amt / 0.8 : amt;
+  }
+
+  String _formatAmount(double amt) {
+    return '${amt.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]}.")} VNĐ';
+  }
+
+  DateTime _getRenewalDate() {
+    final now = DateTime.now();
+    return widget.isYearly ? now.add(const Duration(days: 365)) : now.add(const Duration(days: 30));
+  }
+
+  String _formatDate(DateTime d) {
+    return '${d.day.toString().padLeft(2, "0")}/${d.month.toString().padLeft(2, "0")}/${d.year}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      if (uri.scheme == 'guidetar' && uri.host == 'payment-result') {
+        _handlePaymentResult(uri);
+      }
+    });
+  }
+
+  void _handlePaymentResult(Uri uri) {
+    if (!mounted) return;
+
+    final status = uri.queryParameters['status'];
+    final paymentCode = uri.queryParameters['payment_code'] ?? '';
+
+    // Close loading state if active
+    if (_isPaying) {
+      setState(() {
+        _isPaying = false;
+      });
+    }
+
+    if (status == 'success') {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => _SuccessPaymentDialog(
+          paymentCode: paymentCode,
+          amount: _formatAmount(_getAmount()),
+          method: 'VNPAY',
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanh toán thất bại hoặc đã bị hủy')),
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _linkSubscription?.cancel();
     _cardController.dispose();
     _expiryController.dispose();
     _cvvController.dispose();
@@ -45,12 +129,15 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
     setState(() {
       _isPaying = true;
     });
+
     Map<String, dynamic> payment;
     try {
       payment = await BackendApi.pay(
-        amount: 600000,
+        amount: _getAmount(),
         currency: 'VND',
-        methodType: _method == _PaymentMethod.bank ? 'card' : 'qr',
+        methodType: 'vnpay',
+        planId: widget.plan['id'],
+        billingCycle: widget.isYearly ? 'yearly' : 'monthly',
       );
     } on ApiException catch (error) {
       if (!mounted) {
@@ -69,41 +156,33 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
       return;
     }
 
-    final shouldShowSuccess = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => _PendingPaymentDialog(
-        paymentCode: (payment['payment_code'] ?? '').toString(),
-        amount:
-            '${(payment['amount'] ?? 0).toString()} ${(payment['currency'] ?? 'VND').toString()}',
-        method: _method == _PaymentMethod.bank ? 'Thẻ ngân hàng' : 'Mã QR',
-      ),
-    );
+    setState(() {
+      _isPaying = false;
+    });
 
-    if (!mounted || shouldShowSuccess != true) {
-      if (mounted) {
-        setState(() {
-          _isPaying = false;
-        });
+    // Handle VNPay URL
+    final paymentUrl = payment['payment_url'] as String?;
+    if (paymentUrl != null && paymentUrl.isNotEmpty) {
+      final uri = Uri.parse(paymentUrl);
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể mở trang thanh toán VNPay'),
+            ),
+          );
+        }
       }
-      return;
-    }
-
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => _SuccessPaymentDialog(
-        paymentCode: (payment['payment_code'] ?? '').toString(),
-        amount:
-            '${(payment['amount'] ?? 0).toString()} ${(payment['currency'] ?? 'VND').toString()}',
-        method: _method == _PaymentMethod.bank ? 'Thẻ ngân hàng' : 'Mã QR',
-      ),
-    );
-
-    if (mounted) {
-      setState(() {
-        _isPaying = false;
-      });
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lỗi: Không nhận được URL thanh toán từ server'),
+          ),
+        );
+      }
     }
   }
 
@@ -135,7 +214,7 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          'MAESTRO',
+                          widget.plan['code'].toString().toUpperCase(),
                           style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
                             fontSize: 60 * 0.5,
@@ -181,7 +260,7 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                         Row(
                           children: [
                             Text(
-                              '600.000 VNĐ',
+                              _formatAmount(_getAmount()),
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white,
                                 fontSize: 47 * 0.5,
@@ -189,7 +268,7 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                               ),
                             ),
                             Text(
-                              ' /năm',
+                              widget.isYearly ? ' /năm' : ' /tháng',
                               style: GoogleFonts.plusJakartaSans(
                                 color: const Color(0xFFF79633),
                                 fontSize: 31 * 0.5,
@@ -224,13 +303,13 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                               color: const Color(0xFFB1AEAA),
                               fontSize: 13 * 0.8,
                             ),
-                            children: const [
-                              TextSpan(
+                            children: [
+                              const TextSpan(
                                 text: 'Đơn hàng sẽ tự động thanh toán vào ',
                               ),
                               TextSpan(
-                                text: '06/06/2027',
-                                style: TextStyle(color: Color(0xFFF79633)),
+                                text: _formatDate(_getRenewalDate()),
+                                style: const TextStyle(color: Color(0xFFF79633)),
                               ),
                             ],
                           ),
@@ -250,90 +329,75 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Xác nhận đơn hàng',
+                          'Phương thức thanh toán',
                           style: GoogleFonts.plusJakartaSans(
                             color: Colors.white,
                             fontSize: 45 * 0.5,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _MethodButton(
-                                label: 'Thẻ ngân hàng',
-                                icon: Icons.credit_card_rounded,
-                                selected: _method == _PaymentMethod.bank,
-                                onTap: () {
-                                  setState(() {
-                                    _method = _PaymentMethod.bank;
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _MethodButton(
-                                label: 'Mã QR',
-                                icon: Icons.qr_code_rounded,
-                                selected: _method == _PaymentMethod.qr,
-                                onTap: () {
-                                  setState(() {
-                                    _method = _PaymentMethod.qr;
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
                         const SizedBox(height: 16),
-                        if (_method == _PaymentMethod.bank) ...[
-                          const _InputLabel('Mã số thẻ'),
-                          const SizedBox(height: 8),
-                          _PaymentInput(controller: _cardController),
-                          const SizedBox(height: 12),
-                          Row(
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF101113),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFF79633),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _InputLabel('Ngày hết hạn'),
-                                    const SizedBox(height: 8),
-                                    _PaymentInput(
-                                      controller: _expiryController,
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                  ],
-                                ),
+                                    child: Image.network(
+                                      'https://vnpay.vn/s1/vnpay/logo.png',
+                                      height: 24,
+                                      width: 80,
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.payment,
+                                                color: Colors.black,
+                                              ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Cổng thanh toán VNPAY',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _InputLabel('CVV'),
-                                    const SizedBox(height: 8),
-                                    _PaymentInput(controller: _cvvController),
-                                  ],
+                              const SizedBox(height: 12),
+                              Text(
+                                'Thanh toán an toàn qua VNPAY với thẻ ATM nội địa, Visa, MasterCard, JCB, hoặc quét mã QR qua ứng dụng ngân hàng và Ví điện tử.',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: const Color(0xFF8E8B88),
+                                  fontSize: 13,
+                                  height: 1.5,
                                 ),
                               ),
                             ],
                           ),
-                        ] else ...[
-                          Center(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                'https://api.qrserver.com/v1/create-qr-code/?size=225x225&data=GuideTar-PAY-7XQ4-92LM-3K8V',
-                                width: 225,
-                                height: 225,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 14),
+                        ),
+                        const SizedBox(height: 16),
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
@@ -344,8 +408,8 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                           child: Column(
                             children: [
                               _TotalLine(
-                                label: 'Gói MAESTRO ( 1 năm )',
-                                value: '756.000 VNĐ',
+                                label: 'Gói ${widget.plan['code']} ( ${widget.isYearly ? "1 năm" : "1 tháng"} )',
+                                value: _formatAmount(_getBaseAmount()),
                                 labelColor: const Color(0xFFA98F77),
                                 valueColor: const Color(0xFFE4E3E1),
                               ),
@@ -378,7 +442,7 @@ class _MembershipPaymentPageState extends State<MembershipPaymentPage> {
                                       fit: BoxFit.scaleDown,
                                       alignment: Alignment.centerRight,
                                       child: Text(
-                                        '600.000 VNĐ',
+                                        _formatAmount(_getAmount()),
                                         style: GoogleFonts.plusJakartaSans(
                                           color: const Color(0xFFF79633),
                                           fontSize: 45 * 0.5,

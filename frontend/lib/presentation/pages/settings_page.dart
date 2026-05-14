@@ -7,6 +7,7 @@ import 'package:guidetar/presentation/pages/login_page.dart';
 import 'package:guidetar/presentation/pages/membership_page.dart';
 import 'package:guidetar/presentation/pages/terms_policy_page.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
+import 'package:guidetar/data/backend_api.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -19,6 +20,32 @@ class _SettingsPageState extends State<SettingsPage> {
   int _selectedNavIndex = 2;
   bool _notificationOn = true;
   _AppLanguage _language = _AppLanguage.english;
+  Map<String, dynamic>? _subscription;
+  bool _isLoadingSubscription = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubscription();
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final sub = await BackendApi.getBillingSubscription();
+      if (mounted) {
+        setState(() {
+          _subscription = sub;
+          _isLoadingSubscription = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingSubscription = false;
+        });
+      }
+    }
+  }
 
   Future<void> _showLanguagePopup() async {
     _AppLanguage tempSelection = _language;
@@ -182,23 +209,37 @@ class _SettingsPageState extends State<SettingsPage> {
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
-                                      colors: [Color(0xFFFF9F4A), Color(0xFFFD8B00)],
+                                      colors: [
+                                        Color(0xFFFF9F4A),
+                                        Color(0xFFFD8B00),
+                                      ],
                                     ),
                                     borderRadius: BorderRadius.circular(999),
                                     boxShadow: const [
                                       BoxShadow(
-                                        color: Color.fromRGBO(255, 159, 74, 0.25),
+                                        color: Color.fromRGBO(
+                                          255,
+                                          159,
+                                          74,
+                                          0.25,
+                                        ),
                                         blurRadius: 16,
                                         offset: Offset(0, 8),
                                       ),
                                     ],
                                   ),
                                   child: TextButton(
-                                    onPressed: () => Navigator.of(context).pop(tempSelection),
+                                    onPressed: () => Navigator.of(
+                                      context,
+                                    ).pop(tempSelection),
                                     style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(999),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
                                       ),
                                     ),
                                     child: Text(
@@ -256,11 +297,13 @@ class _SettingsPageState extends State<SettingsPage> {
                         title: 'Gói thành viên',
                         showDivider: false,
                         onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const MembershipPage(),
-                            ),
-                          );
+                          Navigator.of(context)
+                              .push(
+                                MaterialPageRoute(
+                                  builder: (_) => const MembershipPage(),
+                                ),
+                              )
+                              .then((_) => _loadSubscription());
                         },
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -274,11 +317,25 @@ class _SettingsPageState extends State<SettingsPage> {
                                 color: const Color(0xFF353534),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(
-                                  color: const Color.fromRGBO(255, 183, 127, 0.2),
+                                  color: const Color.fromRGBO(
+                                    255,
+                                    183,
+                                    127,
+                                    0.2,
+                                  ),
                                 ),
                               ),
                               child: Text(
-                                'MIỄN PHÍ',
+                                _isLoadingSubscription
+                                    ? '...'
+                                    : (_subscription != null &&
+                                              _subscription!['status'] ==
+                                                  'active'
+                                          ? (_subscription!['plan_name']
+                                                    ?.toString()
+                                                    .toUpperCase() ??
+                                                'HỘI VIÊN')
+                                          : 'MIỄN PHÍ'),
                                 style: GoogleFonts.plusJakartaSans(
                                   color: const Color(0xFFFFB77F),
                                   fontSize: 10,
