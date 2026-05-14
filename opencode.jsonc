@@ -4,7 +4,10 @@
     "figma": {
       "type": "remote",
       "url": "https://mcp.figma.com/mcp",
-      "enabled": true
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer ${FIGMA_ACCESS_TOKEN}"
+      }
     },
     "supabase": {
       "type": "remote",

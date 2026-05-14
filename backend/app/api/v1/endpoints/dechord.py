@@ -181,11 +181,21 @@ async def analyze_history_detail(
         analysis_id,
     )
 
-    chords = [dict(row)["chord_label"] or "" for row in beats_rows]
+    chords: list[str] = []
+    beats: list[float | None] = []
+    for row in beats_rows:
+        item = dict(row)
+        chords.append(item.get("chord_label") or "")
+
+        beat_time = item.get("beat_time_seconds")
+        if beat_time is None:
+            beats.append(None)
+        else:
+            beats.append(float(beat_time))
 
     return {
         "chords": chords,
-        "beats": [],
+        "beats": beats,
         "beatDetectionResult": {
             "bpm": analysis_row.get("bpm", 0),
             "time_signature": analysis_row.get("time_signature", 4),

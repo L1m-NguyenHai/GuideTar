@@ -117,8 +117,8 @@ class _TopBar extends StatelessWidget {
               ),
             ),
             Container(
-              width: 28,
-              height: 28,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFFFF8C00), width: 1.2),
@@ -127,7 +127,7 @@ class _TopBar extends StatelessWidget {
               child: const Icon(
                 Icons.settings_outlined,
                 color: Color(0xFFFF8C00),
-                size: 14,
+                size: 20,
               ),
             ),
           ],
@@ -329,7 +329,9 @@ class _HeroSection extends StatelessWidget {
                               width: 2,
                             ),
                             image: const DecorationImage(
-                              image: AssetImage('assets/images/guitar_course_hero.png'),
+                              image: AssetImage(
+                                'assets/images/guitar_course_hero.png',
+                              ),
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -359,6 +361,7 @@ class _CurriculumSection extends StatelessWidget {
           title: 'Chương 1: Làm quen\nvới Guitar',
           badge: 'Sơ cấp',
           badgeColor: const Color(0xFFFF8C00),
+          badgePadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
         ),
         const SizedBox(height: 24),
         _LessonCard(
@@ -386,9 +389,7 @@ class _CurriculumSection extends StatelessWidget {
           accent: true,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const GuitarCMajorLessonPage(),
-              ),
+              MaterialPageRoute(builder: (_) => const GuitarCMajorLessonPage()),
             );
           },
         ),
@@ -397,6 +398,7 @@ class _CurriculumSection extends StatelessWidget {
           title: 'Chương 2: Nhịp\nphách',
           badge: 'Trung cấp',
           badgeColor: const Color(0xFFADAAAA),
+          badgePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           faded: true,
         ),
         const SizedBox(height: 24),
@@ -414,12 +416,14 @@ class _SectionHeader extends StatelessWidget {
     required this.title,
     required this.badge,
     required this.badgeColor,
+    required this.badgePadding,
     this.faded = false,
   });
 
   final String title;
   final String badge;
   final Color badgeColor;
+  final EdgeInsets badgePadding;
   final bool faded;
 
   @override
@@ -446,7 +450,7 @@ class _SectionHeader extends StatelessWidget {
             ),
             const SizedBox(width: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: badgePadding,
               decoration: BoxDecoration(
                 color: badgeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(9999),
@@ -527,8 +531,8 @@ class _LessonCard extends StatelessWidget {
                     color: active
                         ? const Color(0xFFFF8C00)
                         : completed
-                            ? const Color.fromRGBO(255, 140, 0, 0.2)
-                            : const Color(0xFF2A2A29),
+                        ? const Color.fromRGBO(255, 140, 0, 0.2)
+                        : const Color(0xFF2A2A29),
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -536,10 +540,18 @@ class _LessonCard extends StatelessWidget {
                     active
                         ? 'assets/icons/guitar_course_chevron.svg'
                         : completed
-                            ? 'assets/icons/guitar_course_back.svg'
-                            : 'assets/icons/guitar_course_arrow.svg',
-                    width: active ? 11 : completed ? 20 : 16,
-                    height: active ? 14 : completed ? 20 : 21,
+                        ? 'assets/icons/guitar_course_back.svg'
+                        : 'assets/icons/guitar_course_arrow.svg',
+                    width: active
+                        ? 11
+                        : completed
+                        ? 20
+                        : 16,
+                    height: active
+                        ? 14
+                        : completed
+                        ? 20
+                        : 21,
                   ),
                 ),
                 const SizedBox(width: 20),
@@ -595,7 +607,9 @@ class _LessonCard extends StatelessWidget {
             SizedBox(
               width: 4,
               height: 16,
-              child: SvgPicture.asset('assets/icons/guitar_course_progress.svg'),
+              child: SvgPicture.asset(
+                'assets/icons/guitar_course_progress.svg',
+              ),
             )
           else
             SizedBox(
@@ -775,21 +789,19 @@ class _InstructorCard extends StatelessWidget {
           const SizedBox(height: 22),
           Container(
             width: double.infinity,
+            height: 39,
             decoration: BoxDecoration(
               border: Border.all(color: const Color.fromRGBO(255, 140, 0, 0.3)),
               borderRadius: BorderRadius.circular(9999),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-              child: Center(
-                child: Text(
-                  'Xem hồ sơ',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: const Color(0xFFFF8C00),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 24 / 16,
-                  ),
+            child: Center(
+              child: Text(
+                'Xem hồ sơ',
+                style: GoogleFonts.plusJakartaSans(
+                  color: const Color(0xFFFF8C00),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  height: 24 / 16,
                 ),
               ),
             ),

@@ -4,10 +4,12 @@ import asyncio
 import collections
 import collections.abc
 import json
+import logging
 import math
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Optional, cast
 from uuid import uuid4
@@ -21,6 +23,8 @@ import httpx
 
 from app.core.database import execute, is_db_ready
 from app.core.security import decode_token
+
+logger = logging.getLogger(__name__)
 
 # madmom compatibility patches for modern Python/Numpy.
 if not hasattr(collections, "MutableSequence"):
@@ -597,16 +601,27 @@ async def save_analysis_history(
     )
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def _run_analysis_pipeline(
     audio_path: Path,
     model_repo: Path,
     lab_path: Path,
     chord_dict: str,
 ) -> tuple[list[float], float, str, list[dict[str, float | str]], str]:
+    t0 = time.time()
     beats, bpm = detect_beats_madmom(audio_path)
+    t1 = time.time()
+    logger.info("Beat detection (madmom): %.1fs", t1 - t0)
     logs = run_chord_cnn_lstm(model_repo, audio_path, lab_path, chord_dict)
+    t2 = time.time()
+    logger.info("Chord recognition (subprocess): %.1fs", t2 - t1)
     chords = parse_lab_file(lab_path)
     lab_text = lab_path.read_text(encoding="utf-8")
+    logger.info("Pipeline total: %.1fs", time.time() - t0)
     return beats, bpm, logs, chords, lab_text
 
 
@@ -629,6 +644,7 @@ async def analyze_audio_file_or_url(
         raise HTTPException(status_code=400, detail="Only MP3 upload is supported.")
 
     loop = asyncio.get_running_loop()
+    logger.info("Starting analyze for file=%s youtube=%s", file.filename if file else None, youtube_url)
 
     with tempfile.TemporaryDirectory(prefix="guidetar_api_") as tmpdir:
         tmp_dir = Path(tmpdir)
@@ -638,11 +654,14 @@ async def analyze_audio_file_or_url(
 
         if file:
             audio_path.write_bytes(await file.read())
+            logger.info("File uploaded: %.1f MB", audio_path.stat().st_size / 1e6)
         elif youtube_url:
             try:
+                t0 = time.time()
                 downloaded_path, video_title = await loop.run_in_executor(
                     None, _download_youtube, youtube_url, tmp_dir,
                 )
+                logger.info("YouTube download: %.1fs", time.time() - t0)
                 shutil.copy2(downloaded_path, audio_path)
                 filename_for_response = f"{video_title}.mp3"
             except Exception as exc:

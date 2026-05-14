@@ -52,10 +52,11 @@ class _GuitarCMajorLessonPageState extends State<GuitarCMajorLessonPage> {
                         backgroundColor: const Color(0xFFFF8C00),
                         foregroundColor: const Color(0xFF4B2800),
                         elevation: 0,
+                        fixedSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 22),
+                        padding: EdgeInsets.zero,
                       ),
                       child: Text(
                         'ĐÁNH DẤU HOÀN THÀNH',
@@ -262,7 +263,9 @@ class _VideoPlayerMock extends StatelessWidget {
                   height: 64,
                   decoration: BoxDecoration(
                     color: const Color.fromRGBO(255, 140, 0, 0.24),
-                    border: Border.all(color: const Color.fromRGBO(255, 140, 0, 0.4)),
+                    border: Border.all(
+                      color: const Color.fromRGBO(255, 140, 0, 0.4),
+                    ),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -292,11 +295,19 @@ class _VideoPlayerMock extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.replay_10, color: Colors.white70, size: 18),
+                    const Icon(
+                      Icons.replay_10,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
                     const SizedBox(width: 12),
                     const Icon(Icons.pause, color: Colors.white70, size: 18),
                     const SizedBox(width: 12),
-                    const Icon(Icons.forward_10, color: Colors.white70, size: 18),
+                    const Icon(
+                      Icons.forward_10,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
                     const SizedBox(width: 14),
                     Text(
                       '04:20 / 12:45',
@@ -307,11 +318,19 @@ class _VideoPlayerMock extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.volume_up_rounded, color: Colors.white70, size: 17),
+                    const Icon(
+                      Icons.volume_up_rounded,
+                      color: Colors.white70,
+                      size: 17,
+                    ),
                     const SizedBox(width: 12),
                     const Icon(Icons.settings, color: Colors.white70, size: 17),
                     const SizedBox(width: 12),
-                    const Icon(Icons.fullscreen, color: Colors.white70, size: 17),
+                    const Icon(
+                      Icons.fullscreen,
+                      color: Colors.white70,
+                      size: 17,
+                    ),
                   ],
                 ),
               ],
@@ -337,7 +356,9 @@ class _MetaHeader extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color.fromRGBO(255, 140, 0, 0.1),
-                border: Border.all(color: const Color.fromRGBO(255, 140, 0, 0.2)),
+                border: Border.all(
+                  color: const Color.fromRGBO(255, 140, 0, 0.2),
+                ),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
@@ -352,7 +373,11 @@ class _MetaHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Icon(Icons.schedule_outlined, color: Color(0xFFC4C7CF), size: 14),
+            const Icon(
+              Icons.schedule_outlined,
+              color: Color(0xFFC4C7CF),
+              size: 14,
+            ),
             const SizedBox(width: 4),
             Text(
               '12 phút',
@@ -383,11 +408,17 @@ class _MetaHeader extends StatelessWidget {
               height: 56,
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                border: Border.all(color: const Color.fromRGBO(255, 140, 0, 0.3), width: 2),
+                border: Border.all(
+                  color: const Color.fromRGBO(255, 140, 0, 0.3),
+                  width: 2,
+                ),
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
-                child: Image.asset('assets/images/guitar_course_avatar.png', fit: BoxFit.cover),
+                child: Image.asset(
+                  'assets/images/guitar_course_avatar.png',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -487,7 +518,11 @@ class _NoteTabs extends StatelessWidget {
                   color: const Color.fromRGBO(255, 140, 0, 0.1),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFFF8C00), size: 20),
+                child: const Icon(
+                  Icons.lightbulb_outline_rounded,
+                  color: Color(0xFFFF8C00),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -508,7 +543,9 @@ class _NoteTabs extends StatelessWidget {
                     const SizedBox(height: 10),
                     _TipLine(text: 'Không để lòng bàn tay chạm vào dây dưới.'),
                     const SizedBox(height: 10),
-                    _TipLine(text: 'Kiểm tra từng dây một để đảm bảo tiếng vang.'),
+                    _TipLine(
+                      text: 'Kiểm tra từng dây một để đảm bảo tiếng vang.',
+                    ),
                   ],
                 ),
               ),
@@ -563,11 +600,16 @@ class _NextLessonCard extends StatelessWidget {
                 right: 14,
                 bottom: 12,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color.fromRGBO(0, 0, 0, 0.8),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color.fromRGBO(255, 255, 255, 0.12)),
+                    border: Border.all(
+                      color: const Color.fromRGBO(255, 255, 255, 0.12),
+                    ),
                   ),
                   child: Text(
                     '15:30',
@@ -628,7 +670,9 @@ class _LessonListItem extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: active ? const Color.fromRGBO(255, 140, 0, 0.1) : Colors.transparent,
+        color: active
+            ? const Color.fromRGBO(255, 140, 0, 0.1)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(24),
         border: active
             ? Border.all(color: const Color.fromRGBO(255, 140, 0, 0.2))
@@ -640,14 +684,18 @@ class _LessonListItem extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: active ? const Color.fromRGBO(255, 140, 0, 0.2) : const Color(0xFF333538),
+              color: active
+                  ? const Color.fromRGBO(255, 140, 0, 0.2)
+                  : const Color(0xFF333538),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Text(
               index,
               style: GoogleFonts.manrope(
-                color: active ? const Color(0xFFFF8C00) : const Color(0xFFC4C7CF),
+                color: active
+                    ? const Color(0xFFFF8C00)
+                    : const Color(0xFFC4C7CF),
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 height: 24 / 16,
@@ -662,7 +710,9 @@ class _LessonListItem extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    color: active ? const Color(0xFFFF8C00) : const Color(0xFFE2E2E6),
+                    color: active
+                        ? const Color(0xFFFF8C00)
+                        : const Color(0xFFE2E2E6),
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     height: 24 / 16,
