@@ -30,7 +30,7 @@ if not hasattr(np, "float"):
 if not hasattr(np, "int"):
     np.int = int  # type: ignore[attr-defined]
 
-DEFAULT_MODEL_REPO = (Path(__file__).resolve().parents[2] / "Models" / "chord-cnn-lstm-model").resolve()
+DEFAULT_MODEL_REPO = (Path(__file__).resolve().parents[2] / "Models").resolve()
 
 
 def detect_beats_madmom(audio_path: Path) -> tuple[list[float], float]:
