@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import get_current_user
 from app.core.database import execute, fetch
 from app.schemas.user import UserMeResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
 
@@ -55,16 +58,20 @@ async def remove_favorite_song(song_id: str, current_user: UserMeResponse = Depe
 
 @router.get("/lessons")
 async def get_favorite_lessons(current_user: UserMeResponse = Depends(get_current_user)) -> list[dict[str, Any]]:
-    rows = await fetch(
-        """
-        select l.id, l.title, l.description, l.level, l.thumbnail_url, f.created_at as favorited_at
-        from user_favorite_lessons f
-        join lessons l on l.id = f.lesson_id
-        where f.user_id = $1
-        order by f.created_at desc
-        """,
-        current_user.id,
-    )
+    try:
+        rows = await fetch(
+            """
+            select l.id, l.title, l.description, l.level, l.thumbnail_url, f.created_at as favorited_at
+            from user_favorite_lessons f
+            join lessons l on l.id = f.lesson_id
+            where f.user_id = $1
+            order by f.created_at desc
+            """,
+            current_user.id,
+        )
+    except Exception as e:
+        logger.error("favorites/lessons query failed for user %s: %s", current_user.id, e)
+        raise HTTPException(status_code=500, detail=f"Query failed: {e}") from e
     return [dict(row) for row in rows]
 
 
