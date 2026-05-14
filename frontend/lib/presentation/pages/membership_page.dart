@@ -339,7 +339,7 @@ class _MembershipPageState extends State<MembershipPage> {
                   _NextPaymentCard(
                     nextPaymentDate: _subscription?['plan_code'] == 'MAESTRO' 
                         ? _formatDate(_subscription?['renew_at'])
-                        : 'VÔ THỜI HẠN',
+                        : '--/--/----',
                     onChangeTap: () {
                       Navigator.of(context)
                           .push(
@@ -375,18 +375,26 @@ class _MembershipPageState extends State<MembershipPage> {
                   const SizedBox(height: 12),
                   _BenefitCard(
                     title: 'Thư viện bài hát cao cấp',
-                    status: (_subscription == null || _subscription?['status'] == 'active' || _subscription?['plan_code'] == 'SOLO')
+                    status: _subscription?['plan_code'] == 'MAESTRO'
                         ? 'HOẠT ĐỘNG'
-                        : 'CHƯA KÍCH HOẠT',
+                        : 'CƠ BẢN',
                     icon: Icons.library_music_outlined,
                   ),
                   const SizedBox(height: 12),
                   _BenefitCard(
                     title: 'Chế độ luyện tập thông minh',
-                    status: (_subscription == null || _subscription?['status'] == 'active' || _subscription?['plan_code'] == 'SOLO')
+                    status: _subscription?['plan_code'] == 'MAESTRO'
                         ? 'HOẠT ĐỘNG'
-                        : 'CHƯA KÍCH HOẠT',
+                        : 'CƠ BẢN',
                     icon: Icons.auto_awesome_outlined,
+                  ),
+                  const SizedBox(height: 12),
+                  _BenefitCard(
+                    title: 'AI DeChord (Phân tích hợp âm)',
+                    status: _subscription?['plan_code'] == 'MAESTRO'
+                        ? 'KHÔNG GIỚI HẠN'
+                        : '3 LƯỢT / TUẦN',
+                    icon: Icons.psychology_outlined,
                   ),
                   const SizedBox(height: 20),
                   Row(
