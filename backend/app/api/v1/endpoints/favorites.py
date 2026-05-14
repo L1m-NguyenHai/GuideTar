@@ -59,7 +59,7 @@ async def get_favorite_lessons(current_user: UserMeResponse = Depends(get_curren
         """
         select l.id, l.title, l.description, l.level, l.thumbnail_url, f.created_at as favorited_at
         from user_favorite_lessons f
-        join lessons l on l.id = f.lesson_id
+        join piano_lessons l on l.id = f.lesson_id
         where f.user_id = $1
         order by f.created_at desc
         """,
@@ -107,7 +107,7 @@ async def get_recent_lessons(current_user: UserMeResponse = Depends(get_current_
         """
         select l.id, l.title, l.description, l.level, l.thumbnail_url, rl.created_at, rl.last_activated
         from user_recent_lessons rl
-        join lessons l on l.id = rl.lesson_id
+        join piano_lessons l on l.id = rl.lesson_id
         where rl.user_id = $1
         order by rl.last_activated desc
         """,

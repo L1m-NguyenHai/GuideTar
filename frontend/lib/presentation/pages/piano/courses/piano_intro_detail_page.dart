@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:guidetar/data/backend_api.dart';
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
 class PianoIntroDetailPage extends StatefulWidget {
-  const PianoIntroDetailPage({super.key});
+  const PianoIntroDetailPage({super.key, required this.lessonId});
+
+  final String lessonId;
 
   @override
   State<PianoIntroDetailPage> createState() => _PianoIntroDetailPageState();
@@ -13,59 +16,120 @@ class PianoIntroDetailPage extends StatefulWidget {
 
 class _PianoIntroDetailPageState extends State<PianoIntroDetailPage> {
   int _selectedNavIndex = 1;
+  Map<String, dynamic>? _lesson;
+  List<Map<String, dynamic>> _practices = [];
+  List<Map<String, dynamic>> _songs = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    try {
+      final lessons = await BackendApi.getPianoLessons(limit: 1, offset: 0);
+      Map<String, dynamic>? lessonData;
+      for (final l in lessons) {
+        if (l['id'].toString() == widget.lessonId) {
+          lessonData = l;
+          break;
+        }
+      }
+      if (lessonData == null && lessons.isNotEmpty) {
+        lessonData = lessons.first;
+      }
+
+      final practices = await BackendApi.getPianoLessonPractices(widget.lessonId);
+      final songs = await BackendApi.getPianoLessonSongs(widget.lessonId);
+
+      if (mounted) {
+        setState(() {
+          _lesson = lessonData;
+          _practices = practices;
+          _songs = songs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E0D),
       body: SafeArea(
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 126),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  _VideoHeaderSection(),
-                  _CourseTitleSection(),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: _LessonsSection(),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF9F4A)))
+            : _error != null
+                ? Center(
+                    child: Text(_error!, style: GoogleFonts.inter(color: const Color(0xFFA9ABB3))),
+                  )
+                : Stack(
+                    children: [
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 126),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _VideoHeaderSection(
+                              thumbnailUrl: _lesson?['thumbnail_url'],
+                            ),
+                            _CourseTitleSection(
+                              level: _lesson?['level'] ?? 'NGƯỜI MỚI BẮT ĐẦU',
+                              title: _lesson?['title'] ?? '',
+                              lessonCount: _lesson?['number_of_practice'] ?? 0,
+                              songCount: _lesson?['number_of_song'] ?? 0,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: _LessonsSection(practices: _practices),
+                            ),
+                            const SizedBox(height: 28),
+                            _GuidedSongsSection(songs: _songs),
+                          ],
+                        ),
+                      ),
+                      const _TopAppBar(),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: Center(
+                          child: HomeBottomNavbar(
+                            selectedIndex: _selectedNavIndex,
+                            onChanged: (index) {
+                              if (index == 0) {
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                                return;
+                              }
+                              setState(() {
+                                _selectedNavIndex = index;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 28),
-                  _GuidedSongsSection(),
-                ],
-              ),
-            ),
-            const _TopAppBar(),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Center(
-                child: HomeBottomNavbar(
-                  selectedIndex: _selectedNavIndex,
-                  onChanged: (index) {
-                    if (index == 0) {
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                      return;
-                    }
-                    setState(() {
-                      _selectedNavIndex = index;
-                    });
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 }
 
 class _VideoHeaderSection extends StatelessWidget {
-  const _VideoHeaderSection();
+  const _VideoHeaderSection({this.thumbnailUrl});
+
+  final String? thumbnailUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -74,10 +138,19 @@ class _VideoHeaderSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/images/piano_course_detail_hero.png',
-            fit: BoxFit.cover,
-          ),
+          thumbnailUrl != null && thumbnailUrl!.isNotEmpty
+              ? Image.network(
+                  thumbnailUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/piano_course_detail_hero.png',
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Image.asset(
+                  'assets/images/piano_course_detail_hero.png',
+                  fit: BoxFit.cover,
+                ),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -190,7 +263,17 @@ class _TopAppBar extends StatelessWidget {
 }
 
 class _CourseTitleSection extends StatelessWidget {
-  const _CourseTitleSection();
+  const _CourseTitleSection({
+    required this.level,
+    required this.title,
+    required this.lessonCount,
+    required this.songCount,
+  });
+
+  final String level;
+  final String title;
+  final int lessonCount;
+  final int songCount;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +302,7 @@ class _CourseTitleSection extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'NGƯỜI MỚI BẮT ĐẦU',
+                  level.toUpperCase(),
                   style: GoogleFonts.inter(
                     color: const Color(0xFF7FE6DB),
                     fontSize: 12,
@@ -233,7 +316,7 @@ class _CourseTitleSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Giới thiệu về piano',
+            title,
             style: GoogleFonts.plusJakartaSans(
               color: const Color(0xFFECEDF6),
               fontSize: 30,
@@ -246,15 +329,15 @@ class _CourseTitleSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 20, top: 4),
             child: Row(
-              children: const [
+              children: [
                 _MetaInfoItem(
                   iconAsset: 'assets/icons/piano_course_detail_lessons.svg',
-                  text: '12 Bài học',
+                  text: '$lessonCount Bài học',
                 ),
-                SizedBox(width: 24),
+                const SizedBox(width: 24),
                 _MetaInfoItem(
                   iconAsset: 'assets/icons/piano_course_detail_songs.svg',
-                  text: '4 Bài hát',
+                  text: '$songCount Bài hát',
                 ),
               ],
             ),
@@ -315,7 +398,18 @@ class _MetaInfoItem extends StatelessWidget {
 }
 
 class _LessonsSection extends StatelessWidget {
-  const _LessonsSection();
+  const _LessonsSection({required this.practices});
+
+  final List<Map<String, dynamic>> practices;
+
+  String _formatEstTime(dynamic estTime) {
+    if (estTime == null) return '0:00';
+    final seconds = int.tryParse(estTime.toString()) ?? 0;
+    if (seconds == 0) return '0:00';
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '$mins:${secs.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,27 +439,30 @@ class _LessonsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        const _LessonCard(
-          thumbAsset: 'assets/images/piano_course_detail_lesson_1.png',
-          title: '1. Pitch and the\nPiano',
-          subtitle: '8:45 • Các khái niệm cơ bản',
-          iconAsset: 'assets/icons/piano_course_detail_badge_unlocked.svg',
-          unlocked: true,
-        ),
-        const SizedBox(height: 16),
-        const _LessonCard(
-          thumbAsset: 'assets/images/piano_course_detail_lesson_2.png',
-          title: '2. The Staff',
-          subtitle: '12:20 • Trực quan hoá',
-          iconAsset: 'assets/icons/piano_course_detail_lock.svg',
-        ),
-        const SizedBox(height: 16),
-        const _LessonCard(
-          thumbAsset: 'assets/images/piano_course_detail_lesson_3.png',
-          title: '3. Rhythms and\nClefs',
-          subtitle: '15:10 • Kí hiệu thời gian',
-          iconAsset: 'assets/icons/piano_course_detail_lock.svg',
-        ),
+        if (practices.isEmpty)
+          const _LessonCard(
+            thumbAsset: 'assets/images/piano_course_detail_lesson_1.png',
+            title: '1. Pitch and the\nPiano',
+            subtitle: '8:45 • Các khái niệm cơ bản',
+            iconAsset: 'assets/icons/piano_course_detail_badge_unlocked.svg',
+            unlocked: true,
+          )
+        else
+          ...practices.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final practice = entry.value;
+            return Padding(
+              padding: EdgeInsets.only(bottom: idx < practices.length - 1 ? 16 : 0),
+              child: _LessonCard(
+                // thumbAsset: 'assets/images/piano_course_detail_lesson_${(idx % 3) + 1}.png',
+                thumbAsset: practice['img_url'] ?? 'assets/images/piano_course_detail_lesson_1.png',
+                title: '${idx + 1}. ${practice['title'] ?? ''}',
+                subtitle: '${_formatEstTime(practice['est_time'])} • ${practice['description'] ?? ''}',
+                iconAsset: 'assets/icons/piano_course_detail_badge_unlocked.svg',
+                unlocked: true,
+              ),
+            );
+          }),
       ],
     );
   }
@@ -482,7 +579,9 @@ class _LessonCard extends StatelessWidget {
 }
 
 class _GuidedSongsSection extends StatelessWidget {
-  const _GuidedSongsSection();
+  const _GuidedSongsSection({required this.songs});
+
+  final List<Map<String, dynamic>> songs;
 
   @override
   Widget build(BuildContext context) {
@@ -518,23 +617,39 @@ class _GuidedSongsSection extends StatelessWidget {
         const SizedBox(height: 16),
         SizedBox(
           height: 216,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            children: const [
-              _SongCard(
-                imageAsset: 'assets/images/piano_course_detail_song_1.png',
-                title: "Brahms' Lullaby",
-                subtitle: 'Classical • Johannes Brahms',
-              ),
-              SizedBox(width: 24),
-              _SongCard(
-                imageAsset: 'assets/images/piano_course_detail_song_2.png',
-                title: 'La Cucaracha',
-                subtitle: 'Folk • Traditional',
-              ),
-            ],
-          ),
+          child: songs.isEmpty
+              ? ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  children: const [
+                    _SongCard(
+                      imageAsset: 'assets/images/piano_course_detail_song_1.png',
+                      title: "Brahms' Lullaby",
+                      subtitle: 'Classical • Johannes Brahms',
+                    ),
+                    SizedBox(width: 24),
+                    _SongCard(
+                      imageAsset: 'assets/images/piano_course_detail_song_2.png',
+                      title: 'La Cucaracha',
+                      subtitle: 'Folk • Traditional',
+                    ),
+                  ],
+                )
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  separatorBuilder: (_, __) => const SizedBox(width: 24),
+                  itemCount: songs.length,
+                  itemBuilder: (context, index) {
+                    final song = songs[index];
+                    return _SongCard(
+                      imageAsset: song['thumbnail_url'] ?? 'assets/images/piano_course_detail_song_1.png',
+                      title: song['name'] ?? '',
+                      subtitle: '${song['type'] ?? ''} • ${song['author'] ?? ''}',
+                      grade: song['grade'],
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -546,11 +661,13 @@ class _SongCard extends StatelessWidget {
     required this.imageAsset,
     required this.title,
     required this.subtitle,
+    this.grade,
   });
 
   final String imageAsset;
   final String title;
   final String subtitle;
+  final String? grade;
 
   @override
   Widget build(BuildContext context) {
@@ -566,31 +683,34 @@ class _SongCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(imageAsset, fit: BoxFit.cover),
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 12, bottom: 12),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(0, 0, 0, 0.6),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'GRADE 1',
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                          height: 15 / 10,
+                  imageAsset.startsWith('assets/')
+                      ? Image.asset(imageAsset, fit: BoxFit.cover)
+                      : Image.network(imageAsset, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF1C2028))),
+                  if (grade != null && grade!.isNotEmpty)
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12, bottom: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color.fromRGBO(0, 0, 0, 0.6),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'GRADE $grade',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1,
+                            height: 15 / 10,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

@@ -519,6 +519,42 @@ class BackendApi {
     return _decodeMap(response);
   }
 
+  static Future<List<Map<String, dynamic>>> getPianoLessons({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/lessons/piano?limit=$limit&offset=$offset',
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  static Future<List<Map<String, dynamic>>> getPianoLessonPractices(String lessonId) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/lessons/piano/$lessonId/practices',
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
+  static Future<List<Map<String, dynamic>>> getPianoLessonSongs(String lessonId) async {
+    final response = await _request(
+      method: 'GET',
+      path: '/lessons/piano/$lessonId/songs',
+    );
+    final payload = await _decodeList(response);
+    return payload
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
+  }
+
   static Future<Map<String, dynamic>> pay({
     required double amount,
     required String currency,
