@@ -30,7 +30,7 @@ class ArtistSongsPage extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         itemCount: songs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final song = songs[index];
           final title = (song['title'] ?? '').toString();
@@ -53,7 +53,7 @@ class ArtistSongsPage extends StatelessWidget {
                           width: 56,
                           height: 56,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             width: 56,
                             height: 56,
                             color: const Color(0xFF2A2A2A),

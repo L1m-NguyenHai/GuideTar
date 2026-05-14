@@ -1,0 +1,46 @@
+sequenceDiagram
+    participant User as "👤 User"
+    participant Frontend as "📱 Frontend"
+    participant AuthSession as "🔐 AuthSession"
+    participant Server as "🖥️ FastAPI Server"
+    participant DB as "🗄️ PostgreSQL"
+    participant ChordModel as "🎸 Chord-CNN-LSTM"
+    participant YT as "🌐 YouTube / File"
+
+    alt Tải file MP3
+        User->>Frontend: Chọn file MP3 từ thiết bị
+    else Dán YouTube URL
+        User->>Frontend: Dán YouTube URL
+        Frontend->>YT: fetch oEmbed preview
+        YT-->>Frontend: title + thumbnail
+    end
+
+    User->>Frontend: Nhấn "Phân tích"
+    Frontend->>Server: POST /api/analyze (multipart)
+    Note over Frontend,Server: file: MP3 | youtube_url: URL<br/>Authorization: Bearer token<br/>Timeout: 300s
+
+    alt Nguồn YouTube
+        Server->>YT: yt-dlp download + FFmpeg extract MP3
+        YT-->>Server: input_audio.mp3
+    else Nguồn File
+        Server->>Server: Ghi uploaded bytes → input_audio.mp3
+    end
+
+    Server->>Server: detect_beats_madmom(input_audio)
+    Note over Server: madmom RNNBeatProcessor<br/>→ DBNBeatTrackingProcessor<br/>→ beat_list, bpm
+
+    Server->>ChordModel: run_chord_recognition.py (subprocess)
+    Note over Server,ChordModel: uv run python chord_recognition.py<br/>input_audio.mp3 → result_chords.lab
+    ChordModel-->>Server: result_chords.lab
+
+    Server->>Server: parse_lab_file() → chords [{start, end, chord}]
+    Server->>Server: build_analysis_result()
+    Note over Server: estimate_time_signature()<br/>synchronize_chords()<br/>build_grid_alignment_metadata()
+
+    Server->>DB: INSERT dechord_analyses (source_type, bpm, ...)
+    Server->>DB: INSERT dechord_analysis_beats (index, chord_label, ...)
+    Server->>DB: DELETE old (keep 5 records/user)
+
+    Server-->>Frontend: 200 JSON {chords, beats, bpm, chord_count}
+    Frontend->>Frontend: Parse → DechordAnalyzeResult → ResultPage
+    Frontend-->>User: Chord timeline + audio player + capo transpose

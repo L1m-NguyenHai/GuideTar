@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:gap/gap.dart';
 
 class AddNotePage extends StatefulWidget {
-  const AddNotePage({Key? key}) : super(key: key);
+  const AddNotePage({super.key});
 
   @override
   State<AddNotePage> createState() => _AddNotePageState();

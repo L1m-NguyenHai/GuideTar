@@ -1009,6 +1009,8 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
 
     final trimmed = rawLabels.map((label) => label.trim()).toList(growable: false);
     final compressed = List<String>.from(rawLabels);
+    final anchorIndex = length > 1 ? 1 : 0;
+    final anchorTrimmed = trimmed[anchorIndex];
 
     for (int i = 1; i < length; i++) {
       final current = trimmed[i];
@@ -1022,15 +1024,20 @@ class _ResultChordTimelineState extends State<_ResultChordTimeline> {
     final allSameNonEmpty = trimmed.every((label) => label.isNotEmpty) &&
         trimmed.every((label) => label == trimmed.first);
     if (allSameNonEmpty) {
-      for (int i = 1; i < length; i++) {
+      for (int i = 0; i < length; i++) {
+        if (i == anchorIndex) continue;
         compressed[i] = '';
       }
-      compressed[0] = rawLabels.first;
+      compressed[anchorIndex] = rawLabels[anchorIndex];
+    }
+
+    if (anchorTrimmed.isNotEmpty) {
+      compressed[anchorIndex] = rawLabels[anchorIndex];
     }
 
     final hasAny = compressed.any((label) => label.trim().isNotEmpty);
-    if (!hasAny && carryChord.trim().isNotEmpty) {
-      compressed[length - 1] = carryChord;
+    if (anchorTrimmed.isEmpty && carryChord.trim().isNotEmpty && (!hasAny || compressed[anchorIndex].trim().isEmpty)) {
+      compressed[anchorIndex] = carryChord;
     }
 
     return compressed;

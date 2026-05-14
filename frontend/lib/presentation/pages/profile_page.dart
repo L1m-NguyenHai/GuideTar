@@ -562,7 +562,7 @@ class _FavoritesSectionState extends State<_FavoritesSection> {
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: displayCount,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (_, index) {
                   final song = songs[index];
                   return _FavoriteSongCard(
@@ -610,7 +610,7 @@ class _FavoriteSongCard extends StatelessWidget {
                       ? Image.network(
                           thumbnailUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             color: const Color(0xFF2A2A29),
                             child: const Icon(
                               Icons.music_note,
@@ -825,7 +825,7 @@ class _RecentCourseCard extends StatelessWidget {
                     ? Image.network(
                         thumbnailUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        errorBuilder: (_, _, _) => Container(
                           color: const Color(0xFF2A2A29),
                           child: const Icon(
                             Icons.image_not_supported,

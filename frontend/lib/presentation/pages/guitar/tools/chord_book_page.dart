@@ -201,7 +201,7 @@ class _RecommendedSection extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: 3,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  separatorBuilder: (_, _) => const SizedBox(width: 16),
                   itemBuilder: (context, index) => const _RecommendedCardLoading(),
                 );
               }
@@ -212,7 +212,7 @@ class _RecommendedSection extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  separatorBuilder: (_, _) => const SizedBox(width: 16),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     final title = (item['title'] ?? '').toString();
@@ -308,7 +308,7 @@ class _RecommendCard extends StatelessWidget {
                             width: 256,
                             height: 144,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Image.asset(
+                            errorBuilder: (_, _, _) => Image.asset(
                               'assets/images/chord_reco_song_gio.png',
                               width: 256,
                               height: 144,
@@ -673,7 +673,7 @@ class _SquareCard extends StatelessWidget {
                           ? Image.network(
                               data.imageUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Image.asset(
+                              errorBuilder: (_, _, _) => Image.asset(
                                 data.imageAsset ?? 'assets/images/profile_user_avatar.png',
                                 fit: BoxFit.cover,
                               ),

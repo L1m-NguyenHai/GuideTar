@@ -254,7 +254,7 @@ class _CatalogSongChordPageState extends State<CatalogSongChordPage> {
                       child: Text(
                         _note,
                         style: GoogleFonts.splineSans(
-                          color: const Color(0xFFE6FFFFFF),
+                          color: const Color(0xffe6ffffff),
                           fontSize: 14,
                           height: 20 / 14,
                         ),
@@ -541,7 +541,7 @@ class _MediaCard extends StatelessWidget {
                           ? Image.network(
                               thumbnailUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Image.asset(
+                              errorBuilder: (_, _, _) => Image.asset(
                                 'assets/images/chord_reco_song_gio.png',
                                 fit: BoxFit.cover,
                               ),
@@ -724,7 +724,7 @@ class _LyricsSection extends StatelessWidget {
       return Text(
         'Database hiện chưa có lyrics chi tiết cho bài này.',
         style: GoogleFonts.splineSans(
-          color: const Color(0xFFE6FFFFFF),
+          color: const Color(0xffe6ffffff),
           fontSize: 16,
           height: 29.25 / 18,
           letterSpacing: 0.45,
