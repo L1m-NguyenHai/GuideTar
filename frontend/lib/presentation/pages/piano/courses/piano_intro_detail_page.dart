@@ -30,16 +30,13 @@ class _PianoIntroDetailPageState extends State<PianoIntroDetailPage> {
 
   Future<void> _fetchData() async {
     try {
-      final lessons = await BackendApi.getPianoLessons(limit: 1, offset: 0);
+      final lessons = await BackendApi.getPianoLessons(limit: 100, offset: 0);
       Map<String, dynamic>? lessonData;
       for (final l in lessons) {
         if (l['id'].toString() == widget.lessonId) {
           lessonData = l;
           break;
         }
-      }
-      if (lessonData == null && lessons.isNotEmpty) {
-        lessonData = lessons.first;
       }
 
       final practices = await BackendApi.getPianoLessonPractices(widget.lessonId);
