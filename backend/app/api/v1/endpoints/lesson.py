@@ -31,7 +31,7 @@ async def get_all_piano_lessons(
         SELECT id, title, description, level, thumbnail_url, created_at,
                number_of_practice, number_of_song
         FROM public.piano_lessons
-        ORDER BY created_at DESC
+        ORDER BY created_at ASC
         LIMIT $1 OFFSET $2
         """,
         limit,

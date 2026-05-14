@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:guidetar/data/backend_api.dart';
+import 'package:guidetar/presentation/pages/piano/courses/piano_intro_detail_page.dart';
 import 'package:guidetar/presentation/pages/support_page.dart';
 
 import 'package:guidetar/presentation/pages/add_note_page.dart';
@@ -777,6 +778,15 @@ class _RecentLessonsSectionState extends State<_RecentLessonsSection> {
                       thumbnailUrl: (lesson['thumbnail_url'] ?? '').toString(),
                       progress: 0.6,
                       progressText: '60%',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PianoIntroDetailPage(
+                              lessonId: (lesson['id'] ?? '').toString(),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   );
                 },
@@ -796,6 +806,7 @@ class _RecentCourseCard extends StatelessWidget {
     required this.progressText,
     required this.thumbnailUrl,
     this.description,
+    this.onTap,
   });
 
   final String title;
@@ -803,29 +814,42 @@ class _RecentCourseCard extends StatelessWidget {
   final String thumbnailUrl;
   final double progress;
   final String progressText;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF20201E),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 192,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                thumbnailUrl.isNotEmpty
-                    ? Image.network(
-                        thumbnailUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF20201E),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 192,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  thumbnailUrl.isNotEmpty
+                      ? Image.network(
+                          thumbnailUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, __) => Container(
+                            color: const Color(0xFF2A2A29),
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              color: Color(0xFFDEC1AF),
+                              size: 40,
+                            ),
+                          ),
+                        )
+                      : Container(
                           color: const Color(0xFF2A2A29),
                           child: const Icon(
                             Icons.image_not_supported,
@@ -833,132 +857,124 @@ class _RecentCourseCard extends StatelessWidget {
                             size: 40,
                           ),
                         ),
-                      )
-                    : Container(
-                        color: const Color(0xFF2A2A29),
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          color: Color(0xFFDEC1AF),
-                          size: 40,
-                        ),
-                      ),
-                _SafeSvgAsset('assets/icons/profile_recent_overlay.svg'),
-              ],
+                  _SafeSvgAsset('assets/icons/profile_recent_overlay.svg'),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.spaceGrotesk(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    height: 28 / 20,
-                  ),
-                ),
-                if (description == null || description!.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 18.33,
-                          height: 13.33,
-                          child: _SafeSvgAsset(
-                            'assets/icons/profile_meta_lessons.svg',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '12 Bài học',
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFFA9ABB3),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            height: 24 / 16,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        SizedBox(
-                          width: 10,
-                          height: 15,
-                          child: _SafeSvgAsset(
-                            'assets/icons/profile_meta_songs.svg',
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '4 Bài hát',
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFFA9ABB3),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            height: 24 / 16,
-                          ),
-                        ),
-                      ],
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      height: 28 / 20,
                     ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.manrope(
-                        color: const Color(0xFFDEC1AF),
-                        fontSize: 14,
-                        height: 20 / 14,
+                  ),
+                  if (description == null || description!.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 18.33,
+                            height: 13.33,
+                            child: _SafeSvgAsset(
+                              'assets/icons/profile_meta_lessons.svg',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '12 Bài học',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFA9ABB3),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              height: 24 / 16,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          SizedBox(
+                            width: 10,
+                            height: 15,
+                            child: _SafeSvgAsset(
+                              'assets/icons/profile_meta_songs.svg',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '4 Bài hát',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFA9ABB3),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              height: 24 / 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        description!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.manrope(
+                          color: const Color(0xFFDEC1AF),
+                          fontSize: 14,
+                          height: 20 / 14,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'PROGRESS',
+                        style: GoogleFonts.manrope(
+                          color: const Color(0xFFDEC1AF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          height: 16 / 12,
+                        ),
+                      ),
+                      Text(
+                        progressText,
+                        style: GoogleFonts.manrope(
+                          color: const Color(0xFFFFB786),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          height: 16 / 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: const Color(0xFF353533),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFF97F08),
                       ),
                     ),
                   ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'PROGRESS',
-                      style: GoogleFonts.manrope(
-                        color: const Color(0xFFDEC1AF),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                        height: 16 / 12,
-                      ),
-                    ),
-                    Text(
-                      progressText,
-                      style: GoogleFonts.manrope(
-                        color: const Color(0xFFFFB786),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                        height: 16 / 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4,
-                    backgroundColor: const Color(0xFF353533),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFF97F08),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
