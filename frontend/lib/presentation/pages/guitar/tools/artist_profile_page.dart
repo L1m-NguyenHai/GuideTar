@@ -89,7 +89,7 @@ class _ArtistProfilePageState extends State<ArtistProfilePage> {
             Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildGradientFallback(artistName),
+              errorBuilder: (_, _, _) => _buildGradientFallback(artistName),
             )
           else
             _buildGradientFallback(artistName),
@@ -441,7 +441,7 @@ class _PopularSongRow extends StatelessWidget {
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       width: 56,
                       height: 56,
                       color: const Color(0xFF2A2A2A),

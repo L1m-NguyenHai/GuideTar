@@ -1,0 +1,111 @@
+graph TB
+    %% Actors
+    Guest["👤 Guest"]
+    User["👤 Authenticated User"]
+    ProUser["👤 Pro User"]
+    Admin["🛡️ Admin"]
+    User -.->|extends| Guest
+    ProUser -.->|extends| User
+    Admin -.->|extends| ProUser
+
+    subgraph System["🎵 GuideTar System"]
+        %% Authentication
+        Register(("Register<br/>Account"))
+        Login(("Login"))
+        Refresh(("Refresh<br/>Token"))
+        Forgot(("Forgot<br/>Password"))
+
+        %% Dashboard & Profile
+        Dashboard(("View<br/>Dashboard"))
+        Profile(("View/Edit<br/>Profile"))
+        Favorites(("View<br/>Favorites"))
+
+        %% Guitar
+        Dechord(("Analyze<br/>Audio/YouTube"))
+        History(("View Analysis<br/>History"))
+        HistDetail(("View History<br/>Detail"))
+        ChordBook(("Browse<br/>Chord Book"))
+        SongChord(("View Song<br/>Chords"))
+        Tuner(("Use<br/>Tuner"))
+        GuitarTrain(("Guitar Ear<br/>Training"))
+        GuitarCourse(("Browse Guitar<br/>Courses"))
+        GuitarLesson(("Guitar<br/>Lesson"))
+        
+        %% Piano
+        PianoSim(("Piano<br/>Simulator"))
+        PianoSheet(("Piano Sheet<br/>Player"))
+        PianoCourse(("Browse Piano<br/>Courses"))
+        PianoLesson(("Piano<br/>Lesson"))
+
+        %% Billing
+        Plans(("View<br/>Plans"))
+        Subscribe(("Purchase<br/>Plan"))
+        Subscription(("View<br/>Subscription"))
+        Cancel(("Cancel<br/>Subscription"))
+        Transactions(("View<br/>Transactions"))
+
+        %% Support
+        FAQ(("View<br/>FAQ"))
+        Chat(("Chat<br/>Support"))
+
+        %% Admin
+        ManageUsers(("Manage<br/>Users"))
+        ManageContent(("Manage<br/>Content"))
+        SystemAnalytics(("View System<br/>Analytics"))
+        ModSupport(("Moderate<br/>Support"))
+    end
+
+    %% Guest
+    Guest --> Register
+    Guest --> Login
+    Guest --> Forgot
+    Guest --> Plans
+    Guest --> FAQ
+
+    %% User — free, access to most features (with limits)
+    User --> Refresh
+    User --> Dashboard
+    User --> Profile
+    User --> Favorites
+    User --> Dechord
+    User --> History
+    User --> ChordBook
+    User --> SongChord
+    User --> Tuner
+    User --> GuitarTrain
+    User --> GuitarCourse
+    User --> PianoSim
+    User --> PianoSheet
+    User --> PianoCourse
+    User --> Subscription
+    User --> Transactions
+    User --> Chat
+
+    %% Pro User — inherits User + exclusive content & unlimited usage
+    ProUser --> Subscribe
+    ProUser --> Cancel
+    ProUser --> HistDetail
+    ProUser --> GuitarLesson
+    ProUser --> PianoLesson
+
+    %% Admin — inherits Pro User + system management
+    Admin --> ManageUsers
+    Admin --> ManageContent
+    Admin --> SystemAnalytics
+    Admin --> ModSupport
+
+    %% Constraints & limits (notes)
+    DechordNote["🔒 Limit: 10 analyses/month (Free) vs Unlimited (Pro)"]
+    DechordNote -.-> Dechord
+
+    LessonNote["🔒 Courses: browse (Free) vs full lessons (Pro)"]
+    LessonNote -.-> GuitarCourse
+    LessonNote -.-> PianoCourse
+
+    %% Use case relationships
+    Dechord ..>|<<extend>>| History
+    History ..>|<<extend>>| HistDetail
+    ChordBook ..>|<<extend>>| SongChord
+    GuitarCourse ..>|<<extend>>| GuitarLesson
+    PianoCourse ..>|<<extend>>| PianoLesson
+    Plans ..>|<<extend>>| Subscribe

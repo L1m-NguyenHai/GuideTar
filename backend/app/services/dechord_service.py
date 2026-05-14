@@ -12,6 +12,7 @@ from typing import Any, Optional, cast
 from uuid import uuid4
 
 import numpy as np
+import asyncpg
 from fastapi import HTTPException, Request, UploadFile
 from madmom.features.beats import DBNBeatTrackingProcessor, RNNBeatProcessor
 from yt_dlp import YoutubeDL
@@ -522,25 +523,45 @@ async def save_analysis_history(
         detected_bpm = beat_detection.get("bpm")
         detected_time_signature = int(beat_detection.get("time_signature", 4))
 
-    await execute(
-        """
-        insert into dechord_analyses (
-            id, user_id, source_type, source_name, source_url, thumbnail_url,
-            bpm, time_signature, chord_count, raw_chord_count
+    try:
+        await execute(
+            """
+            insert into dechord_analyses (
+                id, user_id, source_type, source_name, source_url, thumbnail_url,
+                bpm, time_signature, chord_count, raw_chord_count
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            """,
+            analysis_id,
+            user_id,
+            "youtube" if youtube_url else "file",
+            filename_for_response,
+            youtube_url,
+            thumbnail_url,
+            detected_bpm,
+            detected_time_signature,
+            response.get("chord_count", 0),
+            response.get("rawChordCount", 0),
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        """,
-        analysis_id,
-        user_id,
-        "youtube" if youtube_url else "file",
-        filename_for_response,
-        youtube_url,
-        thumbnail_url,
-        detected_bpm,
-        detected_time_signature,
-        response.get("chord_count", 0),
-        response.get("rawChordCount", 0),
-    )
+    except asyncpg.UndefinedColumnError:
+        await execute(
+            """
+            insert into dechord_analyses (
+                id, user_id, source_type, source_name, source_url,
+                bpm, time_signature, chord_count, raw_chord_count
+            )
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            """,
+            analysis_id,
+            user_id,
+            "youtube" if youtube_url else "file",
+            filename_for_response,
+            youtube_url,
+            detected_bpm,
+            detected_time_signature,
+            response.get("chord_count", 0),
+            response.get("rawChordCount", 0),
+        )
 
     grid_chords = cast(list[str], response.get("chords", []))
     grid_beats = cast(list[Optional[float]], response.get("beats", []))
