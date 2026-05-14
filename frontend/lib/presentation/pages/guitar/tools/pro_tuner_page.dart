@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:guidetar/core/audio/pitch_detector.dart';
+import 'package:guidetar/core/audio/tuner_service.dart';
 import 'package:guidetar/presentation/pages/guitar/tools/pro_tuner_settings_page.dart';
-
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
 
 class ProTunerPage extends StatefulWidget {
@@ -24,17 +27,57 @@ class _ProTunerPageState extends State<ProTunerPage> {
   bool _isAuto = true;
   int _selectedStringIndex = 1;
 
+  final TunerService _tuner = TunerService();
+  PitchResult? _pitch;
+  StreamSubscription<PitchResult?>? _pitchSub;
+
   static const List<String> _strings = ['E', 'A', 'D', 'G', 'B', 'e'];
+
+  @override
+  void initState() {
+    super.initState();
+    _initTuner();
+  }
+
+  Future<void> _initTuner() async {
+    await _tuner.requestPermission();
+    await _tuner.start();
+    _pitchSub = _tuner.pitchStream.listen((p) {
+      if (!mounted) return;
+      setState(() {
+        _pitch = p;
+        if (_isAuto && p != null) {
+          _selectedStringIndex = PitchDetector.closestStringIndex(p.frequency);
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _pitchSub?.cancel();
+    _tuner.dispose();
+    super.dispose();
+  }
+
+  String get _displayValue {
+    if (_pitch == null) return '--';
+    final c = _pitch!.cents.round();
+    if (c >= 0) return '+$c';
+    return '$c';
+  }
+
+  double get _needleRotation {
+    if (_pitch == null) return 0;
+    return _pitch!.cents.clamp(-50, 50) / 50 * 0.5;
+  }
 
   void _onNavChanged(int index) {
     if (index == 0) {
       Navigator.of(context).popUntil((route) => route.isFirst);
       return;
     }
-
-    setState(() {
-      _selectedNavIndex = index;
-    });
+    setState(() => _selectedNavIndex = index);
   }
 
   @override
@@ -66,17 +109,14 @@ class _ProTunerPageState extends State<ProTunerPage> {
                   const SizedBox(height: 7),
                   _ModeToggle(
                     isAuto: _isAuto,
-                    onChanged: (value) {
-                      setState(() {
-                        _isAuto = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _isAuto = value),
                   ),
                   const SizedBox(height: 13),
                   _PitchIndicator(
                     ringAsset: _pitchRingAsset,
                     needleAsset: _pitchNeedleAsset,
-                    value: '+5',
+                    value: _displayValue,
+                    needleRotation: _needleRotation,
                   ),
                   const SizedBox(height: 13),
                   _NeckStage(
@@ -85,22 +125,20 @@ class _ProTunerPageState extends State<ProTunerPage> {
                     stepperPlayAsset: _stepperPlayAsset,
                     strings: _strings,
                     selectedIndex: _selectedStringIndex,
-                    onStringSelected: (value) {
-                      setState(() {
-                        _selectedStringIndex = value;
-                      });
-                    },
+                    targetFreq: _pitch != null
+                        ? PitchDetector.stringFrequency(_selectedStringIndex)
+                        : null,
+                    currentFreq: _pitch?.frequency,
+                    onStringSelected: (value) =>
+                        setState(() => _selectedStringIndex = value),
                   ),
                   Transform.translate(
                     offset: const Offset(0, -14),
                     child: _BottomStringsBar(
                       strings: _strings,
                       selectedIndex: _selectedStringIndex,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedStringIndex = value;
-                        });
-                      },
+                      onChanged: (value) =>
+                          setState(() => _selectedStringIndex = value),
                     ),
                   ),
                 ],
@@ -280,11 +318,17 @@ class _ModeChip extends StatelessWidget {
 }
 
 class _PitchIndicator extends StatelessWidget {
-  const _PitchIndicator({required this.ringAsset, required this.needleAsset, required this.value});
+  const _PitchIndicator({
+    required this.ringAsset,
+    required this.needleAsset,
+    required this.value,
+    required this.needleRotation,
+  });
 
   final String ringAsset;
   final String needleAsset;
   final String value;
+  final double needleRotation;
 
   @override
   Widget build(BuildContext context) {
@@ -316,10 +360,13 @@ class _PitchIndicator extends StatelessWidget {
           ),
           Positioned(
             bottom: 0,
-            child: SizedBox(
-              width: 8,
-              height: 10.2,
-              child: SvgPicture.asset(needleAsset),
+            child: Transform.rotate(
+              angle: needleRotation,
+              child: SizedBox(
+                width: 8,
+                height: 10.2,
+                child: SvgPicture.asset(needleAsset),
+              ),
             ),
           ),
         ],
@@ -335,6 +382,8 @@ class _NeckStage extends StatelessWidget {
     required this.stepperPlayAsset,
     required this.strings,
     required this.selectedIndex,
+    this.targetFreq,
+    this.currentFreq,
     required this.onStringSelected,
   });
 
@@ -343,7 +392,17 @@ class _NeckStage extends StatelessWidget {
   final String stepperPlayAsset;
   final List<String> strings;
   final int selectedIndex;
+  final double? targetFreq;
+  final double? currentFreq;
   final ValueChanged<int> onStringSelected;
+
+  Color _tuneColor() {
+    if (currentFreq == null || targetFreq == null) return Colors.white;
+    final diff = (currentFreq! - targetFreq!).abs() / targetFreq! * 100;
+    if (diff < 0.5) return const Color(0xFF4CAF50);
+    if (diff < 2) return const Color(0xFFF58220);
+    return const Color(0xFFE53935);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -388,6 +447,7 @@ class _NeckStage extends StatelessWidget {
                     top: 117,
                     label: strings[2],
                     selected: selectedIndex == 2,
+                    tuneColor: selectedIndex == 2 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(2),
                   ),
@@ -396,6 +456,7 @@ class _NeckStage extends StatelessWidget {
                     top: 117,
                     label: strings[3],
                     selected: selectedIndex == 3,
+                    tuneColor: selectedIndex == 3 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(3),
                   ),
@@ -404,6 +465,7 @@ class _NeckStage extends StatelessWidget {
                     top: 199,
                     label: strings[1],
                     selected: selectedIndex == 1,
+                    tuneColor: selectedIndex == 1 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(1),
                   ),
@@ -412,6 +474,7 @@ class _NeckStage extends StatelessWidget {
                     top: 198,
                     label: strings[4],
                     selected: selectedIndex == 4,
+                    tuneColor: selectedIndex == 4 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(4),
                   ),
@@ -420,6 +483,7 @@ class _NeckStage extends StatelessWidget {
                     top: 279,
                     label: strings[0],
                     selected: selectedIndex == 0,
+                    tuneColor: selectedIndex == 0 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(0),
                   ),
@@ -428,6 +492,7 @@ class _NeckStage extends StatelessWidget {
                     top: 279,
                     label: strings[5],
                     selected: selectedIndex == 5,
+                    tuneColor: selectedIndex == 5 ? _tuneColor() : null,
                     playAsset: stepperPlayAsset,
                     onTap: () => onStringSelected(5),
                   ),
@@ -447,6 +512,7 @@ class _SideStepper extends StatelessWidget {
     required this.top,
     required this.label,
     required this.selected,
+    this.tuneColor,
     required this.playAsset,
     required this.onTap,
   });
@@ -455,11 +521,18 @@ class _SideStepper extends StatelessWidget {
   final double top;
   final String label;
   final bool selected;
+  final Color? tuneColor;
   final String playAsset;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = selected
+        ? (tuneColor ?? const Color(0xFFD5B58C))
+        : null;
+
+    final textColor = selected ? Colors.black : Colors.white;
+
     return Positioned(
       left: left,
       top: top,
@@ -471,7 +544,7 @@ class _SideStepper extends StatelessWidget {
           height: 49.78,
           padding: const EdgeInsets.all(11.313),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFD5B58C) : null,
+            color: bgColor,
             gradient: selected
                 ? null
                 : const LinearGradient(
@@ -512,7 +585,7 @@ class _SideStepper extends StatelessWidget {
                 child: Text(
                   label,
                   style: GoogleFonts.plusJakartaSans(
-                    color: selected ? Colors.black : Colors.white,
+                    color: textColor,
                     fontSize: 18.101,
                     fontWeight: FontWeight.w500,
                     height: 15.838 / 18.101,

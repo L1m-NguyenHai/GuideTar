@@ -2,7 +2,7 @@ def main() -> None:
     import os
     import uvicorn
 
-    reload_flag = os.getenv("UVICORN_RELOAD", "false").strip().lower() in {"1", "true", "yes", "on"}
+    reload_flag = os.getenv("UVICORN_RELOAD", "true").strip().lower() in {"1", "true", "yes", "on"}
     workers_str = os.getenv("UVICORN_WORKERS", "").strip()
 
     kwargs: dict[str, object] = {

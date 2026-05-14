@@ -1,4 +1,5 @@
 from __future__ import annotations
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -29,7 +30,6 @@ async def analyze_limit_status(current_user: UserMeResponse = Depends(get_curren
 
     # Auto-expire logic: if Maestro plan is past its renew_at date, revert to SOLO
     if sub and sub["plan_code"] == "MAESTRO" and sub["status"] == "active" and sub["renew_at"]:
-        from datetime import timezone
         if datetime.now(timezone.utc) > sub["renew_at"]:
             await execute("update user_subscriptions set status = 'expired' where id = $1", sub["id"])
             
@@ -90,10 +90,9 @@ async def analyze_limit_status(current_user: UserMeResponse = Depends(get_curren
     limit = 3
     remaining = max(0, limit - used)
     
-    import datetime
     # Next Monday 00:00:00
-    now = datetime.datetime.now()
-    next_reset = (now + datetime.timedelta(days=(7 - now.weekday()))).replace(hour=0, minute=0, second=0, microsecond=0)
+    now = datetime.now()
+    next_reset = (now + timedelta(days=(7 - now.weekday()))).replace(hour=0, minute=0, second=0, microsecond=0)
     
     return {
         "plan": plan_code,
