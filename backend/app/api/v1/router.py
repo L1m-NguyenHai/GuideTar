@@ -14,6 +14,7 @@ from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.support import router as support_router
 from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.notes import router as notes_router
+from app.api.v1.endpoints.lesson import router as lesson_router
 
 api_router = APIRouter()
 
@@ -29,3 +30,4 @@ api_router.include_router(favorites_router)
 api_router.include_router(analytics_router)
 api_router.include_router(support_router)
 api_router.include_router(notes_router)
+api_router.include_router(lesson_router)

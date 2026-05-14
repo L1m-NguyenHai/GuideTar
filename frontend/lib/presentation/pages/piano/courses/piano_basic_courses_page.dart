@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:guidetar/data/backend_api.dart';
 import 'package:guidetar/presentation/pages/piano/courses/piano_intro_detail_page.dart';
 
 import 'package:guidetar/presentation/widgets/home_bottom_navbar.dart';
@@ -15,10 +16,10 @@ class PianoBasicCoursesPage extends StatefulWidget {
 class _PianoBasicCoursesPageState extends State<PianoBasicCoursesPage> {
   int _selectedNavIndex = 1;
 
-  void _openIntroCourseDetail() {
+  void _openIntroCourseDetail(String lessonId) {
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => const PianoIntroDetailPage()));
+    ).push(MaterialPageRoute(builder: (_) => PianoIntroDetailPage(lessonId: lessonId)));
   }
 
   @override
@@ -177,35 +178,85 @@ class _CourseSectionHeader extends StatelessWidget {
   }
 }
 
-class _BeginnerCoursesCarousel extends StatelessWidget {
+class _BeginnerCoursesCarousel extends StatefulWidget {
   const _BeginnerCoursesCarousel({required this.onIntroTap});
 
-  final VoidCallback onIntroTap;
+  final void Function(String lessonId) onIntroTap;
+
+  @override
+  State<_BeginnerCoursesCarousel> createState() => _BeginnerCoursesCarouselState();
+}
+
+class _BeginnerCoursesCarouselState extends State<_BeginnerCoursesCarousel> {
+  List<Map<String, dynamic>> _lessons = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLessons();
+  }
+
+  Future<void> _fetchLessons() async {
+    try {
+      final lessons = await BackendApi.getPianoLessons(limit: 10, offset: 0);
+      if (mounted) {
+        setState(() {
+          _lessons = lessons;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const SizedBox(
+        height: 240,
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFFF97316)),
+        ),
+      );
+    }
+
+    if (_error != null || _lessons.isEmpty) {
+      return SizedBox(
+        height: 240,
+        child: Center(
+          child: Text(
+            _error ?? 'Không có bài học',
+            style: GoogleFonts.inter(color: const Color(0xFFA9ABB3)),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 240,
-      child: ListView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        children: [
-          _CourseCard(
-            imageAsset: 'assets/images/piano_courses_beginner_1.png',
-            level: 'LEVEL 1',
-            title: 'Giới thiệu về piano',
-            lessons: '12 bài học',
-            duration: '45 phút',
-            onTap: onIntroTap,
-          ),
-          const SizedBox(width: 20),
-          const _CourseCard(
-            imageAsset: 'assets/images/piano_courses_beginner_2.png',
-            level: 'LEVEL 2',
-            title: 'Chơi các bài hát đơn',
-            lessons: '8 bài học',
-            duration: '32 phút',
-          ),
-        ],
+        itemCount: _lessons.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 20),
+        itemBuilder: (context, index) {
+          final lesson = _lessons[index];
+          return _CourseCard(
+            imageAsset: lesson['thumbnail_url'] ?? 'assets/images/piano_courses_beginner_1.png',
+            level: lesson['level'] ?? 'LEVEL 1',
+            title: lesson['title'] ?? '',
+            lessons: '${lesson['number_of_practice'] ?? 0} bài học',
+            duration: '${lesson['number_of_song'] ?? 0} bài hát',
+            onTap: () => widget.onIntroTap(lesson['id'].toString()),
+          );
+        },
       ),
     );
   }
